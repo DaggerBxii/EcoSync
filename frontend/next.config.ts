@@ -5,8 +5,8 @@ const nextConfig: NextConfig = {
   images: {
     unoptimized: true,
   },
-  basePath: process.env.BASE_PATH || "",
-  assetPrefix: process.env.BASE_PATH ? `/${process.env.BASE_PATH}/` : "",
+  basePath: "/EcoSync",
+  assetPrefix: "/EcoSync/",
 };
 
 export default nextConfig;
