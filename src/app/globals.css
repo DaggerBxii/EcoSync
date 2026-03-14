@@ -1,0 +1,149 @@
+@import "tailwindcss";
+
+:root {
+  /* EcoSync Color Palette - Humanitarian Green Theme */
+  --ecosync-green-primary: #10b981;
+  --ecosync-green-dark: #059669;
+  --ecosync-green-light: #34d399;
+  --ecosync-green-pale: #d1fae5;
+  
+  --ecosync-black: #0a0a0a;
+  --ecosync-black-soft: #171717;
+  --ecosync-gray: #737373;
+  --ecosync-gray-light: #e5e5e5;
+  
+  --background: #ffffff;
+  --foreground: #0a0a0a;
+  
+  /* Energy Resource Colors */
+  --energy-solar: #fbbf24;
+  --energy-wind: #60a5fa;
+  --energy-water: #22d3ee;
+  --energy-internet: #a78bfa;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-ecosync-green: var(--ecosync-green-primary);
+  --color-ecosync-green-dark: var(--ecosync-green-dark);
+  --color-ecosync-green-light: var(--ecosync-green-light);
+  --color-ecosync-green-pale: var(--ecosync-green-pale);
+  --color-ecosync-black: var(--ecosync-black);
+  --color-energy-solar: var(--energy-solar);
+  --color-energy-wind: var(--energy-wind);
+  --color-energy-water: var(--energy-water);
+  --color-energy-internet: var(--energy-internet);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+  line-height: 1.6;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--ecosync-green-primary);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--ecosync-green-dark);
+}
+
+/* Gradient animations for energy visualization */
+@keyframes gradient-shift {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.energy-gradient {
+  background: linear-gradient(
+    -45deg,
+    var(--energy-solar),
+    var(--energy-wind),
+    var(--energy-water),
+    var(--ecosync-green-primary)
+  );
+  background-size: 400% 400%;
+  animation: gradient-shift 15s ease infinite;
+}
+
+/* Pulse animation for live indicators */
+@keyframes pulse-live {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.live-indicator {
+  animation: pulse-live 2s ease-in-out infinite;
+}
+
+/* Fade in animation */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-in {
+  animation: fade-in 0.6s ease-out forwards;
+}
+
+/* Staggered fade in for lists */
+.fade-in-delay-1 {
+  animation: fade-in 0.6s ease-out 0.1s forwards;
+  opacity: 0;
+}
+
+.fade-in-delay-2 {
+  animation: fade-in 0.6s ease-out 0.2s forwards;
+  opacity: 0;
+}
+
+.fade-in-delay-3 {
+  animation: fade-in 0.6s ease-out 0.3s forwards;
+  opacity: 0;
+}
+
+.fade-in-delay-4 {
+  animation: fade-in 0.6s ease-out 0.4s forwards;
+  opacity: 0;
+}
