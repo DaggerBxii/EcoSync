@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { ThemeProvider } from "@/components/ThemeProvider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -13,24 +14,17 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "EcoSync | Intelligent Sustainability Orchestrator",
-  description:
-    "EcoSync synchronizes high-energy consumption tasks with renewable energy availability. Track real-time solar, wind, water, and internet resources to minimize carbon footprint.",
-  keywords: [
-    "sustainability",
-    "renewable energy",
-    "carbon footprint",
-    "green energy",
-    "solar",
-    "wind",
-    "clean tech",
-  ],
-  authors: [{ name: "EcoSync Team" }],
+  title: "Synclo | Synchronize Operations with Resource Windows",
+  description: "Built for commercial properties — facilities, campuses, hospitals, and data centers. Reduce energy costs by up to 40%.",
+  authors: [{ name: "Synclo" }],
   openGraph: {
-    title: "EcoSync | Intelligent Sustainability Orchestrator",
-    description:
-      "Synchronize your energy consumption with renewable energy availability",
+    title: "Synclo | Commercial Building Management",
+    description: "Synchronize high-demand operations with real resource windows",
     type: "website",
+  },
+  icons: {
+    icon: "/favicon.ico",
+    apple: "/apple-touch-icon.png",
   },
 };
 
@@ -40,11 +34,18 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        {children}
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="dark"
+          enableSystem
+          disableTransitionOnChange
+        >
+          {children}
+        </ThemeProvider>
       </body>
     </html>
   );
