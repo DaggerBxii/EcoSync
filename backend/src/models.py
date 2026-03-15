@@ -14,3 +14,6 @@ class SyncContract(BaseModel):
     metrics: Metrics
     ai_insight: str
     is_anomaly: bool
+    confidence_score: Optional[float] = None
+    unnecessary_usage_detected: Optional[bool] = None
+    optimization_opportunities: Optional[list[str]] = None
