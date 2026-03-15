@@ -1,0 +1,63 @@
+plugins {
+	id 'java'
+	id 'org.springframework.boot' version '2.7.18'
+	id 'io.spring.dependency-management' version '1.0.15.RELEASE'
+}
+
+group = 'com.ecosync'
+version = '0.0.1-SNAPSHOT'
+description = 'Demo project for Spring Boot'
+
+sourceCompatibility = '1.8'
+targetCompatibility = '1.8'
+
+configurations {
+	compileOnly {
+		extendsFrom annotationProcessor
+	}
+}
+
+repositories {
+	mavenCentral()
+}
+
+dependencies {
+	// Core Spring Boot
+	implementation 'org.springframework.boot:spring-boot-starter-web'
+	implementation 'org.springframework.boot:spring-boot-starter-websocket'
+	
+	// Data Persistence (Phase 1)
+	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+	runtimeOnly 'com.h2database:h2'
+	runtimeOnly 'org.postgresql:postgresql'
+	
+	// Machine Learning (Phase 2)
+	implementation 'com.github.haifengl:smile-core:2.6.0'
+	implementation 'com.github.haifengl:smile-math:2.6.0'
+	
+	// External API Integration (Phase 3)
+	implementation 'org.springframework.boot:spring-boot-starter-webflux'
+	implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310'
+	
+	// Security (Phase 6)
+	implementation 'org.springframework.boot:spring-boot-starter-security'
+	
+	// API Documentation (Phase 6) - Spring Boot 2.x compatible version
+	implementation 'org.springdoc:springdoc-openapi-ui:1.7.0'
+	
+	// Monitoring & Observability (Phase 6)
+	implementation 'org.springframework.boot:spring-boot-starter-actuator'
+	implementation 'io.micrometer:micrometer-registry-prometheus'
+	
+	// Lombok
+	compileOnly 'org.projectlombok:lombok'
+	annotationProcessor 'org.projectlombok:lombok'
+	
+	// Testing
+	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+	testImplementation 'org.springframework.security:spring-security-test'
+}
+
+test {
+	useJUnitPlatform()
+}

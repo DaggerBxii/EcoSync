@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EcoSync Power AI - Enhanced Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg-primary: #0f172a;
+            --bg-secondary: #1e293b;
+            --bg-tertiary: #334155;
+            --text-primary: #e2e8f0;
+            --text-secondary: #94a3b8;
+            --accent-blue: #38bdf8;
+            --accent-green: #22c55e;
+            --accent-red: #ef4444;
+            --accent-yellow: #fbbf24;
+            --accent-purple: #a855f7;
+        }
+        
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        body { 
+            font-family: 'Segoe UI', system-ui, sans-serif; 
+            background: var(--bg-primary); 
+            color: var(--text-primary); 
+            padding: 20px;
+            min-height: 100vh;
+        }
+        
+        .container { max-width: 1400px; margin: 0 auto; }
+        
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid var(--bg-tertiary);
+        }
+        
+        header h1 { font-size: 28px; background: linear-gradient(135deg, var(--accent-blue), var(--accent-green)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .header-stats { display: flex; gap: 20px; }
+        .header-stat { text-align: center; }
+        .header-stat-value { font-size: 20px; font-weight: bold; color: var(--accent-blue); }
+        .header-stat-label { font-size: 11px; color: var(--text-secondary); }
+        
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 20px;
+        }
+        
+        .card { 
+            background: var(--bg-secondary); 
+            border: 1px solid var(--bg-tertiary); 
+            padding: 20px; 
+            border-radius: 12px;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.3);
+        }
+        
+        .card h3 { 
+            font-size: 16px; 
+            margin-bottom: 15px; 
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .metric-grid { 
+            display: grid; 
+            grid-template-columns: repeat(2, 1fr); 
+            gap: 15px; 
+        }
+        
+        .metric-box { 
+            background: var(--bg-primary); 
+            padding: 15px; 
+            border-radius: 8px; 
+            text-align: center;
+            border: 1px solid var(--bg-tertiary);
+        }
+        
+        .metric-val { font-size: 28px; font-weight: bold; color: var(--accent-blue); }
+        .metric-val.success { color: var(--accent-green); }
+        .metric-val.warning { color: var(--accent-yellow); }
+        .metric-val.danger { color: var(--accent-red); }
+        .metric-label { font-size: 12px; color: var(--text-secondary); margin-top: 5px; }
+        
+        /* Power Bar Visualization */
+        .bar-container { 
+            background: var(--bg-tertiary); 
+            height: 24px; 
+            border-radius: 12px; 
+            margin-top: 10px; 
+            overflow: hidden;
+            position: relative;
+        }
+        
+        .bar-fill { 
+            height: 100%; 
+            background: linear-gradient(90deg, var(--accent-blue), var(--accent-green)); 
+            width: 0%; 
+            transition: width 0.5s ease;
+            border-radius: 12px;
+        }
+        
+        .bar-fill.alert { 
+            background: linear-gradient(90deg, var(--accent-yellow), var(--accent-red));
+            animation: pulse 1s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+        
+        /* Alert Box */
+        .alert { 
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--accent-red); 
+            font-weight: bold; 
+            border: 1px solid var(--accent-red); 
+            padding: 15px; 
+            border-radius: 8px; 
+            display: none;
+            margin-bottom: 15px;
+        }
+        
+        .alert.show { display: block; animation: slideIn 0.3s ease; }
+        
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        /* Log Box */
+        .log-box { 
+            background: #000; 
+            color: var(--accent-green); 
+            padding: 15px; 
+            height: 200px; 
+            overflow-y: auto; 
+            font-family: 'Consolas', monospace; 
+            font-size: 12px; 
+            border-radius: 8px;
+            border: 1px solid var(--bg-tertiary);
+        }
+        
+        .log-entry { margin-bottom: 5px; }
+        .log-entry.alert { color: var(--accent-red); }
+        .log-entry.warning { color: var(--accent-yellow); }
+        
+        /* Status Badge */
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+        .status-badge.online { background: rgba(34, 197, 94, 0.2); color: var(--accent-green); }
+        .status-badge.offline { background: rgba(239, 68, 68, 0.2); color: var(--accent-red); }
+        
+        /* Chart Container */
+        .chart-container {
+            position: relative;
+            height: 250px;
+            margin-top: 15px;
+        }
+        
+        /* Recommendations */
+        .recommendation {
+            background: var(--bg-primary);
+            border-left: 4px solid var(--accent-blue);
+            padding: 12px;
+            margin-bottom: 10px;
+            border-radius: 0 8px 8px 0;
+        }
+        .recommendation.high { border-left-color: var(--accent-red); }
+        .recommendation.medium { border-left-color: var(--accent-yellow); }
+        .recommendation.low { border-left-color: var(--accent-green); }
+        
+        .rec-title { font-weight: bold; margin-bottom: 5px; }
+        .rec-desc { font-size: 13px; color: var(--text-secondary); }
+        
+        /* Weather Widget */
+        .weather-widget {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            padding: 15px;
+            background: var(--bg-primary);
+            border-radius: 8px;
+        }
+        .weather-icon { font-size: 40px; }
+        .weather-info .temp { font-size: 24px; font-weight: bold; }
+        .weather-info .condition { color: var(--text-secondary); font-size: 13px; }
+        
+        /* Pricing Widget */
+        .pricing-widget {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            background: var(--bg-primary);
+            border-radius: 8px;
+        }
+        .price-current { font-size: 24px; font-weight: bold; color: var(--accent-green); }
+        .price-label { font-size: 12px; color: var(--text-secondary); }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .dashboard-grid { grid-template-columns: 1fr; }
+            .metric-grid { grid-template-columns: 1fr; }
+            header { flex-direction: column; gap: 15px; }
+        }
+        
+        /* Loading State */
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+        .loading::before {
+            content: '';
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--bg-tertiary);
+            border-top-color: var(--accent-blue);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>⚡ EcoSync Power AI Monitor</h1>
+            <div class="header-stats">
+                <div class="header-stat">
+                    <div class="header-stat-value" id="header-efficiency">--%</div>
+                    <div class="header-stat-label">Efficiency</div>
+                </div>
+                <div class="header-stat">
+                    <div class="header-stat-value" id="header-usage">-- W</div>
+                    <div class="header-stat-label">Current</div>
+                </div>
+                <div class="header-stat">
+                    <div class="header-stat-value" id="header-anomalies">0</div>
+                    <div class="header-stat-label">Anomalies Today</div>
+                </div>
+            </div>
+        </header>
+
+        <div class="dashboard-grid">
+            <!-- Status Card -->
+            <div class="card" style="grid-column: span 2;">
+                <h3>📊 System Status <span id="connection-status" class="status-badge offline">Connecting...</span></h3>
+                <div id="integrity-alert" class="alert">
+                    ⚠️ POWER ANOMALY DETECTED - Immediate attention required
+                </div>
+                <div class="metric-grid">
+                    <div class="metric-box">
+                        <div class="metric-label">Current Usage</div>
+                        <div class="metric-val" id="current-usage">--</div>
+                        <div class="metric-label">Watts</div>
+                        <div class="bar-container">
+                            <div id="power-bar" class="bar-fill"></div>
+                        </div>
+                    </div>
+                    <div class="metric-box">
+                        <div class="metric-label">Baseline Usage</div>
+                        <div class="metric-val" id="baseline-usage">--</div>
+                        <div class="metric-label">Watts (learned)</div>
+                    </div>
+                    <div class="metric-box">
+                        <div class="metric-label">Efficiency Score</div>
+                        <div class="metric-val" id="efficiency-score">--</div>
+                        <div class="metric-label">Percent</div>
+                    </div>
+                    <div class="metric-box">
+                        <div class="metric-label">Occupancy</div>
+                        <div class="metric-val" id="occupancy">--</div>
+                        <div class="metric-label">People</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- AI Insight Card -->
+            <div class="card">
+                <h3>🧠 AI Decision Engine</h3>
+                <p id="ai-insight" style="color: var(--text-secondary); line-height: 1.6; min-height: 80px;">
+                    Waiting for data...
+                </p>
+                <div id="ai-status" style="margin-top: 15px; padding: 10px; background: var(--bg-primary); border-radius: 8px;">
+                    <strong>System Status:</strong> <span id="system-status-text">--</span>
+                </div>
+            </div>
+
+            <!-- Weather & Pricing Card -->
+            <div class="card">
+                <h3>🌡️ External Factors</h3>
+                <div class="weather-widget" style="margin-bottom: 15px;">
+                    <div class="weather-icon" id="weather-icon">🌤️</div>
+                    <div class="weather-info">
+                        <div class="temp" id="weather-temp">--°C</div>
+                        <div class="condition" id="weather-condition">--</div>
+                    </div>
+                </div>
+                <div class="pricing-widget">
+                    <div>
+                        <div class="price-label">Current Electricity Price</div>
+                        <div class="price-current" id="electricity-price">$--/kWh</div>
+                    </div>
+                    <div style="text-align: right;">
+                        <div class="price-label">Period</div>
+                        <div id="pricing-period" style="font-weight: bold;">--</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Predictions Chart -->
+            <div class="card">
+                <h3>📈 24-Hour Power Forecast</h3>
+                <div class="chart-container">
+                    <canvas id="forecast-chart"></canvas>
+                </div>
+            </div>
+
+            <!-- Recommendations Card -->
+            <div class="card">
+                <h3>💡 AI Recommendations</h3>
+                <div id="recommendations-list">
+                    <div class="loading">Loading recommendations...</div>
+                </div>
+            </div>
+
+            <!-- System Log -->
+            <div class="card" style="grid-column: span 2;">
+                <h3>📋 System Log</h3>
+                <div id="log" class="log-box"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global state
+        let stompClient = null;
+        let dataHistory = [];
+        let forecastChart = null;
+        let anomalyCount = 0;
+
+        // Initialize Chart.js
+        function initForecastChart() {
+            const ctx = document.getElementById('forecast-chart').getContext('2d');
+            forecastChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Predicted Power (W)',
+                        data: [],
+                        borderColor: '#38bdf8',
+                        backgroundColor: 'rgba(56, 189, 248, 0.1)',
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: '#334155' },
+                            ticks: { color: '#94a3b8' }
+                        },
+                        x: {
+                            grid: { color: '#334155' },
+                            ticks: { color: '#94a3b8' }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Update forecast chart with simulated data
+        function updateForecastChart() {
+            if (!forecastChart) return;
+            
+            const labels = [];
+            const data = [];
+            const now = new Date();
+            
+            for (let i = 0; i < 24; i++) {
+                const hour = new Date(now.getTime() + i * 3600000);
+                labels.push(hour.getHours() + ':00');
+                
+                // Simulated forecast based on time of day
+                const h = hour.getHours();
+                let basePower = 300;
+                if (h >= 9 && h <= 17) basePower = 600;
+                else if (h >= 18 && h <= 22) basePower = 450;
+                else basePower = 200;
+                
+                data.push(basePower + Math.random() * 100);
+            }
+            
+            forecastChart.data.labels = labels;
+            forecastChart.data.datasets[0].data = data;
+            forecastChart.update('none');
+        }
+
+        // Load recommendations
+        function loadRecommendations() {
+            fetch('/api/recommendations')
+                .then(r => r.json())
+                .then(data => {
+                    const container = document.getElementById('recommendations-list');
+                    if (!data || data.length === 0) {
+                        container.innerHTML = '<div style="color: var(--text-secondary);">No recommendations at this time.</div>';
+                        return;
+                    }
+                    
+                    container.innerHTML = data.map(rec => `
+                        <div class="recommendation ${rec.priority.toLowerCase()}">
+                            <div class="rec-title">${rec.title}</div>
+                            <div class="rec-desc">${rec.description}</div>
+                        </div>
+                    `).join('');
+                })
+                .catch(() => {
+                    document.getElementById('recommendations-list').innerHTML = `
+                        <div class="recommendation low">
+                            <div class="rec-title">System Operating Normally</div>
+                            <div class="rec-desc">Continue monitoring. No action required.</div>
+                        </div>
+                    `;
+                });
+        }
+
+        // Load weather and pricing
+        function loadExternalData() {
+            // Weather
+            fetch('/api/weather')
+                .then(r => r.json())
+                .then(data => {
+                    if (data.temperature_c) {
+                        document.getElementById('weather-temp').textContent = Math.round(data.temperature_c) + '°C';
+                        document.getElementById('weather-condition').textContent = data.condition || '--';
+                        
+                        const icons = { 'Clear': '☀️', 'Clouds': '☁️', 'Rain': '🌧️', 'Snow': '❄️', 'Drizzle': '🌦️' };
+                        document.getElementById('weather-icon').textContent = icons[data.condition] || '🌤️';
+                    }
+                })
+                .catch(() => {});
+            
+            // Pricing
+            fetch('/api/pricing')
+                .then(r => r.json())
+                .then(data => {
+                    if (data.current_price_per_kwh) {
+                        document.getElementById('electricity-price').textContent = '$' + data.current_price_per_kwh.toFixed(3) + '/kWh';
+                        
+                        const hour = new Date().getHours();
+                        let period = 'Off-Peak';
+                        if (hour >= 10 && hour <= 17) period = 'Peak';
+                        else if (hour >= 6 && hour <= 21) period = 'Mid-Peak';
+                        document.getElementById('pricing-period').textContent = period;
+                    }
+                })
+                .catch(() => {});
+        }
+
+        // Log function
+        function log(msg, type = 'info') {
+            const logBox = document.getElementById('log');
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+            logBox.appendChild(entry);
+            logBox.scrollTop = logBox.scrollHeight;
+            
+            // Keep only last 100 entries
+            while (logBox.children.length > 100) {
+                logBox.removeChild(logBox.firstChild);
+            }
+        }
+
+        // Update UI with new data
+        function updateUI(data) {
+            const metrics = data.metrics || {};
+            
+            // Update metrics
+            document.getElementById('current-usage').textContent = Math.round(metrics.current_usage || 0);
+            document.getElementById('baseline-usage').textContent = Math.round(metrics.baseline_usage || 0);
+            document.getElementById('occupancy').textContent = metrics.occupancy || 0;
+            
+            const efficiency = Math.round(metrics.efficiency_score || 0);
+            const efficiencyEl = document.getElementById('efficiency-score');
+            efficiencyEl.textContent = efficiency + '%';
+            efficiencyEl.className = 'metric-val ' + (efficiency >= 80 ? 'success' : efficiency >= 50 ? 'warning' : 'danger');
+            
+            // Update header stats
+            document.getElementById('header-efficiency').textContent = efficiency + '%';
+            document.getElementById('header-usage').textContent = Math.round(metrics.current_usage || 0) + ' W';
+            
+            // Update power bar
+            const bar = document.getElementById('power-bar');
+            const width = metrics.baseline_usage > 0 
+                ? Math.min((metrics.current_usage / metrics.baseline_usage) * 100, 100) 
+                : 50;
+            bar.style.width = width + '%';
+            
+            // Update AI insight
+            document.getElementById('ai-insight').textContent = data.ai_insight || 'Processing...';
+            document.getElementById('system-status-text').textContent = data.system_status || '--';
+            
+            // Handle alerts
+            const alertBox = document.getElementById('integrity-alert');
+            if (data.integrity_alert) {
+                alertBox.classList.add('show');
+                bar.classList.add('alert');
+                log('⚠️ ALERT: ' + data.ai_insight, 'alert');
+                anomalyCount++;
+                document.getElementById('header-anomalies').textContent = anomalyCount;
+            } else {
+                alertBox.classList.remove('show');
+                bar.classList.remove('alert');
+                log('✓ ' + data.system_status, 'info');
+            }
+            
+            // Store history for analysis
+            dataHistory.push({
+                timestamp: new Date(),
+                usage: metrics.current_usage,
+                efficiency: metrics.efficiency_score
+            });
+            if (dataHistory.length > 100) dataHistory.shift();
+        }
+
+        // Connect to WebSocket
+        function connect() {
+            stompClient = Stomp.over(new SockJS('/ws'));
+            
+            stompClient.connect({}, function (frame) {
+                document.getElementById('connection-status').textContent = 'Online';
+                document.getElementById('connection-status').className = 'status-badge online';
+                log('Connected to EcoSync AI Backend');
+                
+                stompClient.subscribe('/topic/updates', function (message) {
+                    const data = JSON.parse(message.body);
+                    updateUI(data);
+                });
+                
+                // Load additional data
+                loadRecommendations();
+                loadExternalData();
+                updateForecastChart();
+                
+            }, function(error) {
+                document.getElementById('connection-status').textContent = 'Offline';
+                document.getElementById('connection-status').className = 'status-badge offline';
+                log('Connection failed. Retrying...', 'alert');
+                setTimeout(connect, 5000);
+            });
+        }
+
+        // Initialize on load
+        window.addEventListener('DOMContentLoaded', function() {
+            initForecastChart();
+            connect();
+            
+            // Refresh external data every 5 minutes
+            setInterval(loadExternalData, 5 * 60 * 1000);
+            setInterval(loadRecommendations, 10 * 60 * 1000);
+        });
+    </script>
+</body>
+</html>
