@@ -180,25 +180,42 @@ Respond with ONLY the JSON object."""
 
         return prompt
 
+    def _clean_json_response(self, response_text: str) -> str:
+        """Clean and fix common JSON issues from Gemini responses."""
+        import re
+        
+        # Remove markdown code blocks
+        clean = response_text.strip()
+        if clean.startswith("```json"):
+            clean = clean[7:]
+        elif clean.startswith("```"):
+            clean = clean[3:]
+        if clean.endswith("```"):
+            clean = clean[:-3]
+        clean = clean.strip()
+        
+        # Remove trailing commas before } or ]
+        clean = re.sub(r',\s*}', '}', clean)
+        clean = re.sub(r',\s*]', ']', clean)
+        
+        # Fix unquoted property names - more careful approach
+        # Pattern: (start or { or , or [) (whitespace) (word) (:)
+        clean = re.sub(r'(^|[{\[,])(\s*)([a-zA-Z_][a-zA-Z0-9_]*)(\s*:)', 
+                       lambda m: f'{m.group(1)}{m.group(2)}"{m.group(3)}"{m.group(4)}', clean)
+        
+        # Fix single quotes to double quotes for string delimiters
+        clean = re.sub(r"(?<!\w)'([^']*?)'(?!\w)", r'"\1"', clean)
+        
+        # Fix any remaining bare words that look like property names
+        clean = re.sub(r'([{\[,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)\s*:', r'\1"\2":', clean)
+        
+        return clean
+
     def _parse_gemini_response(self, response_text: str, original_text: str) -> ParsedCommand:
         """Parse Gemini's response into a ParsedCommand."""
         try:
-            # Clean response
-            clean = response_text.strip()
-            if clean.startswith("```json"):
-                clean = clean[7:]
-            if clean.startswith("```"):
-                clean = clean[3:]
-            if clean.endswith("```"):
-                clean = clean[:-3]
-            clean = clean.strip()
-
-            # Fix common JSON issues from Gemini
-            import re
-            clean = re.sub(r',\s*}', '}', clean)
-            clean = re.sub(r',\s*]', ']', clean)
-            clean = re.sub(r'(\w+)(?=\s*:)', r'"\1"', clean)
-            clean = clean.replace("'", '"')
+            # Clean and fix the JSON response
+            clean = self._clean_json_response(response_text)
 
             data = json.loads(clean)
 
@@ -234,6 +251,7 @@ Respond with ONLY the JSON object."""
         except json.JSONDecodeError as e:
             print(f"AIController: Error parsing Gemini response: {e}")
             print(f"AIController: Raw response (first 300 chars): {response_text[:300]}")
+            print(f"AIController: Cleaned response (first 300 chars): {clean[:300] if 'clean' in locals() else 'N/A'}")
             return self._fallback_parse(original_text, None)
 
     def _fallback_parse(self, user_input: str, context: Optional[Dict]) -> ParsedCommand:

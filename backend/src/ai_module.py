@@ -312,35 +312,60 @@ Respond with ONLY the JSON object, no additional text."""
 - Average Efficiency: {avg_efficiency:.1f}%
 - Recent Anomalies: {len(self._anomaly_history[-5:])}"""
 
+    def _clean_json_response(self, response_text: str) -> str:
+        """Clean and fix common JSON issues from Gemini responses."""
+        import re
+        
+        # Remove markdown code blocks
+        clean = response_text.strip()
+        if clean.startswith("```json"):
+            clean = clean[7:]
+        elif clean.startswith("```"):
+            clean = clean[3:]
+        if clean.endswith("```"):
+            clean = clean[:-3]
+        clean = clean.strip()
+        
+        # Remove trailing commas before } or ]
+        clean = re.sub(r',\s*}', '}', clean)
+        clean = re.sub(r',\s*]', ']', clean)
+        
+        # Fix unquoted property names - more careful approach
+        # Match word characters followed by colon, but not already quoted
+        # Use a callback to avoid double-quoting
+        def quote_property(match):
+            # Check if already quoted
+            before = match.group(1)
+            prop = match.group(2)
+            after = match.group(3)
+            # If already has quotes, return as-is
+            if before.endswith('"') or before.endswith("'"):
+                return match.group(0)
+            return f'{before}"{prop}"{after}'
+        
+        # Pattern: (start or { or , or [) (whitespace) (word) (:)
+        clean = re.sub(r'(^|[{\[,])(\s*)([a-zA-Z_][a-zA-Z0-9_]*)(\s*:)', 
+                       lambda m: f'{m.group(1)}{m.group(2)}"{m.group(3)}"{m.group(4)}', clean)
+        
+        # Fix single quotes to double quotes (but not within already quoted strings)
+        # This is tricky - we'll use a simple approach: replace ' with " if it's a JSON delimiter
+        # A safer approach: only replace single quotes that appear to be string delimiters
+        clean = re.sub(r"(?<!\w)'([^']*?)'(?!\w)", r'"\1"', clean)
+        
+        # Fix any remaining bare words that look like property names
+        # This handles cases like {name: "value"} -> {"name": "value"}
+        clean = re.sub(r'([{\[,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)\s*:', r'\1"\2":', clean)
+        
+        return clean
+
     def _parse_gemini_response(
         self, response_text: str, timestamp: datetime,
         metrics: BuildingMetrics, alerts: List[Alert]
     ) -> Dict[str, Any]:
         """Parse the Gemini response into the building status format."""
         try:
-            # Clean the response
-            clean_response = response_text.strip()
-            if clean_response.startswith("```json"):
-                clean_response = clean_response[7:]
-            if clean_response.startswith("```"):
-                clean_response = clean_response[3:]
-            if clean_response.endswith("```"):
-                clean_response = clean_response[:-3]
-            clean_response = clean_response.strip()
-
-            # Try to fix common JSON issues from Gemini
-            import re
-            
-            # Remove trailing commas before } or ]
-            clean_response = re.sub(r',\s*}', '}', clean_response)
-            clean_response = re.sub(r',\s*]', ']', clean_response)
-            
-            # Fix unquoted property names (common Gemini issue)
-            # This regex finds property names that aren't quoted and quotes them
-            clean_response = re.sub(r'(\w+)(?=\s*:)', r'"\1"', clean_response)
-            
-            # Fix single quotes to double quotes
-            clean_response = clean_response.replace("'", '"')
+            # Clean and fix the JSON response
+            clean_response = self._clean_json_response(response_text)
 
             # Parse JSON
             data = json.loads(clean_response)
@@ -372,6 +397,7 @@ Respond with ONLY the JSON object, no additional text."""
         except json.JSONDecodeError as e:
             print(f"EcoBrain: Error parsing Gemini response: {e}")
             print(f"EcoBrain: Raw response (first 500 chars): {response_text[:500]}")
+            print(f"EcoBrain: Cleaned response (first 500 chars): {clean_response[:500] if 'clean_response' in locals() else 'N/A'}")
             return self._fallback_building_decision(
                 timestamp, metrics, data_store.get_all_zones(),
                 data_store.get_all_resources(), alerts, data_store.get_critical_alerts()
