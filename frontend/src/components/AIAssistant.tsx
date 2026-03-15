@@ -140,7 +140,9 @@ export default function AIAssistant({
       });
 
       if (!response.ok) {
-        throw new Error("Failed to process command");
+        const errorData = await response.json().catch(() => ({}));
+        console.error("API Error:", response.status, errorData);
+        throw new Error(errorData.detail || `Server error: ${response.status}`);
       }
 
       const data = await response.json();
@@ -180,8 +182,10 @@ export default function AIAssistant({
 
     } catch (error) {
       setIsTyping(false);
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      console.error("AIAssistant error:", errorMessage);
       addBotMessage(
-        "I'm sorry, I couldn't process that command. Please try again or check if the backend is running.",
+        `I'm sorry, I couldn't process that command. ${errorMessage}. Please make sure the backend is running at ${apiUrl}`,
         "general",
         ["Help", "Try again"]
       );

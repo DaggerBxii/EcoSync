@@ -654,10 +654,10 @@ def simulate_anomaly(
 # ==================== Chatbot Endpoints ====================
 
 @app.post("/api/chatbot/message")
-def chatbot_message(user_id: str, message: str):
+def chatbot_message(request: dict):
     """
     Process a message from the chatbot user.
-    
+
     Request body:
     {
         "user_id": "unique_user_identifier",
@@ -665,11 +665,19 @@ def chatbot_message(user_id: str, message: str):
     }
     """
     try:
+        user_id = request.get("user_id", "default_user")
+        message = request.get("message", "")
+        
+        if not message:
+            raise HTTPException(status_code=400, detail="Message is required")
+        
         response = chatbot.process_message(user_id, message)
         return {
             "success": True,
             "response": response
         }
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing chatbot message: {str(e)}")
 
