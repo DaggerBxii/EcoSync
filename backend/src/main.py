@@ -25,6 +25,7 @@ sys.path.append(str(Path(__file__).parent))
 from ai_module import ai_brain
 from chatbot import chatbot
 from chatbot_engine import chatbot_engine, ChatbotResponse
+from new_chatbot import chatbot as new_chatbot
 from ai_controller import ai_controller, ControlAction
 from models import (
     ResourceType, AlertStatus, AlertSeverity, ResourceStatus, data_store,
@@ -668,24 +669,22 @@ def chatbot_message(request: dict):
     try:
         user_id = request.get("user_id", "default_user")
         message = request.get("message", "")
-        
+
         print(f"Chatbot request: user_id={user_id}, message={message[:50]}...")
-        
+
         if not message:
             raise HTTPException(status_code=400, detail="Message is required")
-        
-        # Use the new chatbot engine
-        response = chatbot_engine.process_message(user_id, message)
-        
-        print(f"Chatbot response: {response.message[:50]}...")
-        
+
+        # Use the new chatbot implementation
+        response = new_chatbot.process_message(user_id, message)
+
+        print(f"Chatbot response: {response['response'][:50]}...")
+
         return {
             "success": True,
-            "response": response.message,
-            "type": response.type,
-            "options": response.options,
-            "data": response.data,
-            "requires_action": response.requires_action
+            "response": response["response"],
+            "type": response["type"],
+            "timestamp": response["timestamp"]
         }
     except HTTPException:
         raise

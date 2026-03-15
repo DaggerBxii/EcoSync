@@ -115,98 +115,112 @@ class ChatbotEngine:
     def process_message(self, user_id: str, message: str) -> ChatbotResponse:
         """
         Process a user message and return a response.
-        
-        This is the main entry point for the chatbot.
-        It handles:
-        - Natural language control commands
-        - Building analytics queries
-        - Conversation flow management
-        - Clarification handling
         """
-        context = self.get_or_create_context(user_id)
-        context.message_count += 1
-        context.last_interaction = datetime.utcnow()
-        
-        message_lower = message.lower().strip()
-        
-        # Check for control commands first
-        control_keywords = [
-            "limit", "set", "turn off", "turn on", "increase", "decrease",
-            "reduce", "optimize", "adjust", "change", "setpoint", "dim",
-            "raise", "lower", "cut", "max", "min"
-        ]
-        
-        is_control = any(keyword in message_lower for keyword in control_keywords)
-        
-        if is_control:
-            return self._handle_control_command(context, message)
-        
-        # Handle based on current conversation step
-        if context.current_step == ConversationStep.GREETING:
-            return self._handle_greeting(context, message)
-        
-        elif context.current_step == ConversationStep.ANALYTICS:
-            return self._handle_analytics_query(context, message)
-        
-        elif context.current_step == ConversationStep.BUILDING_VIEW:
-            return self._handle_building_query(context, message)
-        
-        elif context.current_step == ConversationStep.CLARIFICATION:
-            return self._handle_clarification(context, message)
-        
-        else:
-            return self._handle_general_query(context, message)
+        try:
+            context = self.get_or_create_context(user_id)
+            context.message_count += 1
+            context.last_interaction = datetime.utcnow()
+
+            message_lower = message.lower().strip()
+
+            # Check for control commands first
+            control_keywords = [
+                "limit", "set", "turn off", "turn on", "increase", "decrease",
+                "reduce", "optimize", "adjust", "change", "setpoint", "dim",
+                "raise", "lower", "cut", "max", "min"
+            ]
+
+            is_control = any(keyword in message_lower for keyword in control_keywords)
+
+            if is_control:
+                return self._handle_control_command(context, message)
+
+            # Handle based on current conversation step
+            if context.current_step == ConversationStep.GREETING:
+                return self._handle_greeting(context, message)
+            elif context.current_step == ConversationStep.ANALYTICS:
+                return self._handle_analytics_query(context, message)
+            elif context.current_step == ConversationStep.BUILDING_VIEW:
+                return self._handle_building_query(context, message)
+            elif context.current_step == ConversationStep.CLARIFICATION:
+                return self._handle_clarification(context, message)
+            else:
+                return self._handle_general_query(context, message)
+                
+        except Exception as e:
+            print(f"ChatbotEngine error: {e}")
+            import traceback
+            print(traceback.format_exc())
+            return ChatbotResponse(
+                message="I'm sorry, I encountered an error. Please try again or type 'help' for assistance.",
+                type="error",
+                options=["Help", "Try again", "Main menu"]
+            )
     
     def _handle_control_command(self, context: ConversationContext, message: str) -> ChatbotResponse:
         """Handle natural language control commands."""
-        # Parse the command using AIController
-        parsed = ai_controller.parse_command(message, {
-            "building_name": "Synclo Tower",
-            "current_floor": context.current_floor,
-            "total_floors": 10
-        })
-        
-        # Check if clarification is needed
-        if parsed.needs_clarification:
-            context.current_step = ConversationStep.CLARIFICATION
-            context.pending_command = {
-                "original_message": message,
-                "parsed": parsed
-            }
-            return ChatbotResponse(
-                message=parsed.clarification_question or "Could you please clarify?",
-                type="clarification",
-                options=self._generate_clarification_options(parsed)
-            )
-        
-        # Execute the command
-        result = ai_controller.execute_command(parsed)
-        
-        # Update context
-        context.current_step = ConversationStep.CONTROL
-        if parsed.floor:
-            context.current_floor = parsed.floor
-        if parsed.resource_type:
-            context.selected_resource = parsed.resource_type
-        
-        # Build response
-        response_message = ai_controller.generate_response(message, result)
-        
-        return ChatbotResponse(
-            message=response_message,
-            type="control",
-            options=["Show building view", "Make another change", "View analytics"],
-            data={
-                "control_result": {
-                    "success": result.success,
-                    "resources_affected": result.resources_affected,
-                    "previous_values": result.previous_values,
-                    "new_values": result.new_values,
-                    "estimated_impact": result.estimated_impact
+        try:
+            # Parse the command using AIController
+            parsed = ai_controller.parse_command(message, {
+                "building_name": "Synclo Tower",
+                "current_floor": context.current_floor,
+                "total_floors": 10
+            })
+            
+            print(f"Parsed command: {parsed}")
+            
+            # Check if clarification is needed
+            if parsed.needs_clarification:
+                context.current_step = ConversationStep.CLARIFICATION
+                context.pending_command = {
+                    "original_message": message,
+                    "parsed": parsed
                 }
-            },
-            requires_action=False
-        )
+                return ChatbotResponse(
+                    message=parsed.clarification_question or "Could you please clarify?",
+                    type="clarification",
+                    options=self._generate_clarification_options(parsed)
+                )
+            
+            # Execute the command
+            result = ai_controller.execute_command(parsed)
+            
+            print(f"Control result: success={result.success}, resources={len(result.resources_affected)}")
+            
+            # Update context
+            context.current_step = ConversationStep.CONTROL
+            if parsed.floor:
+                context.current_floor = parsed.floor
+            if parsed.resource_type:
+                context.selected_resource = parsed.resource_type
+            
+            # Build response
+            response_message = ai_controller.generate_response(message, result)
+            
+            return ChatbotResponse(
+                message=response_message,
+                type="control",
+                options=["Show building view", "Make another change", "View analytics"],
+                data={
+                    "control_result": {
+                        "success": result.success,
+                        "resources_affected": result.resources_affected,
+                        "previous_values": result.previous_values,
+                        "new_values": result.new_values,
+                        "estimated_impact": result.estimated_impact
+                    }
+                },
+                requires_action=False
+            )
+        except Exception as e:
+            print(f"Control command error: {e}")
+            import traceback
+            print(traceback.format_exc())
+            return ChatbotResponse(
+                message=f"I couldn't execute that command. Error: {str(e)[:100]}. Try 'help' for examples.",
+                type="error",
+                options=["Help", "Try again", "Main menu"]
+            )
     
     def _handle_greeting(self, context: ConversationContext, message: str) -> ChatbotResponse:
         """Handle initial greeting and onboarding."""

@@ -18,6 +18,10 @@ import {
   TrendingUp,
   RefreshCw,
   Loader2,
+  Building2,
+  Lightbulb,
+  Gauge,
+  Waves,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -26,23 +30,7 @@ interface Message {
   role: "user" | "assistant";
   content: string;
   timestamp: Date;
-  graph?: string;
-  options?: string[];
-  report_data?: ReportData;
-}
-
-interface ReportData {
-  date: string;
-  electricity_usage: number;
-  water_usage: number;
-  hvac_usage: number;
-  lighting_usage: number;
-  electricity_efficiency: number;
-  water_efficiency: number;
-  hvac_efficiency: number;
-  lighting_efficiency: number;
-  recommendations: string[];
-  peak_hours: Record<string, number>;
+  type?: string;
 }
 
 export default function ChatbotPage() {
@@ -50,8 +38,6 @@ export default function ChatbotPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [currentOptions, setCurrentOptions] = useState<string[]>([]);
-  const [reportData, setReportData] = useState<ReportData | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -86,10 +72,8 @@ export default function ChatbotPage() {
               role: "assistant",
               content: data.response,
               timestamp: new Date(),
-              options: data.options,
             },
           ]);
-          setCurrentOptions(data.options || []);
         }
       }
     } catch (error) {
@@ -98,12 +82,10 @@ export default function ChatbotPage() {
         {
           id: "1",
           role: "assistant",
-          content: "Hello! I'm Synclo Assistant, your building resource management AI. I can help you monitor and optimize energy usage, water consumption, and other building resources. How can I help you today?",
+          content: "Hello! I'm EcoSync Assistant, your building resource management AI. I can help you monitor and optimize energy usage, water consumption, and other building resources. How can I help you today?",
           timestamp: new Date(),
-          options: ["Show today's report", "Energy usage", "Efficiency tips", "Optimization recommendations"],
         },
       ]);
-      setCurrentOptions(["Show today's report", "Energy usage", "Efficiency tips", "Optimization recommendations"]);
     }
   };
 
@@ -120,7 +102,6 @@ export default function ChatbotPage() {
     setMessages((prev) => [...prev, userMessage]);
     setInput("");
     setIsLoading(true);
-    setCurrentOptions([]);
 
     try {
       const response = await fetch("/api/chatbot/message", {
@@ -141,10 +122,9 @@ export default function ChatbotPage() {
             role: "assistant",
             content: data.response,
             timestamp: new Date(),
-            options: data.options,
+            type: data.type,
           };
           setMessages((prev) => [...prev, assistantMessage]);
-          setCurrentOptions(data.options || []);
         } else {
           throw new Error(data.error || "Backend returned success: false");
         }
@@ -162,14 +142,9 @@ export default function ChatbotPage() {
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, errorMessage]);
-      setCurrentOptions(["Try again", "Main menu"]);
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const handleOptionClick = (option: string) => {
-    sendMessage(option);
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -181,8 +156,19 @@ export default function ChatbotPage() {
 
   const resetChat = () => {
     setMessages([]);
-    setReportData(null);
     initializeChatbot();
+  };
+
+  // Function to determine icon based on message type
+  const getMessageIcon = (type: string | undefined) => {
+    switch (type) {
+      case 'control':
+        return <Building2 className="w-5 h-5" />;
+      case 'query':
+        return <Lightbulb className="w-5 h-5" />;
+      default:
+        return <Bot className="w-5 h-5" />;
+    }
   };
 
   return (
@@ -195,7 +181,7 @@ export default function ChatbotPage() {
               <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-green-600 to-green-400 flex items-center justify-center shadow-lg">
                 <Activity className="w-5 h-5 text-white" />
               </div>
-              <span className="text-xl font-bold">Synclo</span>
+              <span className="text-xl font-bold">EcoSync</span>
             </Link>
 
             <div className="flex items-center gap-4">
@@ -253,7 +239,7 @@ export default function ChatbotPage() {
                   {message.role === "user" ? (
                     <User className="w-5 h-5" />
                   ) : (
-                    <Bot className="w-5 h-5" />
+                    getMessageIcon(message.type)
                   )}
                 </div>
 
@@ -270,61 +256,13 @@ export default function ChatbotPage() {
                     {message.content}
                   </div>
 
-                  {/* Graph/Image */}
-                  {message.graph && (
-                    <div className="mt-4 rounded-lg overflow-hidden">
-                      <img
-                        src={`data:image/png;base64,${message.graph}`}
-                        alt="Resource usage graph"
-                        className="w-full h-auto"
-                      />
-                    </div>
-                  )}
-
-                  {/* Report Data Visualization */}
-                  {message.report_data && (
-                    <div className="mt-4 grid grid-cols-2 gap-3">
-                      <div className="bg-background/50 rounded-lg p-3">
-                        <Zap className="w-4 h-4 text-yellow-600 mb-1" />
-                        <div className="text-xs opacity-70">Electricity</div>
-                        <div className="font-bold">{message.report_data.electricity_usage} kW</div>
+                  {/* Resource Control Indicators */}
+                  {message.type === 'control' && (
+                    <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+                      <div className="flex items-center gap-2 text-xs text-green-600 dark:text-green-400">
+                        <Gauge className="w-3 h-3" />
+                        <span>Resource Control Command Executed</span>
                       </div>
-                      <div className="bg-background/50 rounded-lg p-3">
-                        <Droplets className="w-4 h-4 text-blue-600 mb-1" />
-                        <div className="text-xs opacity-70">Water</div>
-                        <div className="font-bold">{message.report_data.water_usage} L/min</div>
-                      </div>
-                      <div className="bg-background/50 rounded-lg p-3">
-                        <Thermometer className="w-4 h-4 text-red-600 mb-1" />
-                        <div className="text-xs opacity-70">HVAC</div>
-                        <div className="font-bold">{message.report_data.hvac_usage}°C</div>
-                      </div>
-                      <div className="bg-background/50 rounded-lg p-3">
-                        <TrendingUp className="w-4 h-4 text-green-600 mb-1" />
-                        <div className="text-xs opacity-70">Lighting</div>
-                        <div className="font-bold">{message.report_data.lighting_usage}%</div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Options */}
-                  {message.options && message.options.length > 0 && (
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      {message.options.map((option, i) => (
-                        <button
-                          key={i}
-                          onClick={() => handleOptionClick(option)}
-                          disabled={isLoading}
-                          className={cn(
-                            "px-4 py-2 rounded-full text-sm font-medium transition-all",
-                            message.role === "user"
-                              ? "bg-white/20 hover:bg-white/30 text-white"
-                              : "bg-green-600 hover:bg-green-700 text-white"
-                          )}
-                        >
-                          {option}
-                        </button>
-                      ))}
                     </div>
                   )}
 
@@ -352,33 +290,13 @@ export default function ChatbotPage() {
                 </div>
                 <div className="bg-muted rounded-2xl p-4 flex items-center gap-2">
                   <Loader2 className="w-5 h-5 animate-spin" />
-                  <span className="text-sm">Thinking...</span>
+                  <span className="text-sm">Processing your request...</span>
                 </div>
               </div>
             )}
 
             <div ref={messagesEndRef} />
           </div>
-
-          {/* Current Options Bar (if available) */}
-          {currentOptions.length > 0 && !isLoading && (
-            <div className="border-t bg-background/50 backdrop-blur-sm p-4">
-              <div className="max-w-3xl mx-auto">
-                <div className="text-xs text-muted-foreground mb-2">Quick responses:</div>
-                <div className="flex flex-wrap gap-2">
-                  {currentOptions.map((option, i) => (
-                    <button
-                      key={i}
-                      onClick={() => handleOptionClick(option)}
-                      className="px-4 py-2 rounded-full text-sm font-medium bg-green-600 hover:bg-green-700 text-white transition-all"
-                    >
-                      {option}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
 
           {/* Input Area */}
           <div className="border-t bg-background/50 backdrop-blur-sm p-4">
@@ -390,7 +308,7 @@ export default function ChatbotPage() {
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyPress={handleKeyPress}
-                  placeholder="Ask about building resources, efficiency, or optimization..."
+                  placeholder="Ask about building resources, efficiency, or control systems (e.g. 'Limit water on floor 2 to 60%')..."
                   className="flex-1 px-4 py-3 rounded-xl border bg-background focus:ring-2 focus:ring-green-600 focus:border-transparent"
                   disabled={isLoading}
                 />
@@ -401,6 +319,34 @@ export default function ChatbotPage() {
                 >
                   <Send className="w-5 h-5" />
                   Send
+                </button>
+              </div>
+              
+              {/* Quick Actions */}
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  onClick={() => sendMessage("Show building efficiency")}
+                  className="text-xs px-3 py-1.5 rounded-full bg-green-100 hover:bg-green-200 text-green-800 dark:bg-green-900/30 dark:hover:bg-green-800/50 dark:text-green-300 transition-colors"
+                >
+                  Show efficiency
+                </button>
+                <button
+                  onClick={() => sendMessage("Limit water on floor 2 to 60%")}
+                  className="text-xs px-3 py-1.5 rounded-full bg-blue-100 hover:bg-blue-200 text-blue-800 dark:bg-blue-900/30 dark:hover:bg-blue-800/50 dark:text-blue-300 transition-colors"
+                >
+                  Limit water (floor 2)
+                </button>
+                <button
+                  onClick={() => sendMessage("Turn off lights on floor 5")}
+                  className="text-xs px-3 py-1.5 rounded-full bg-purple-100 hover:bg-purple-200 text-purple-800 dark:bg-purple-900/30 dark:hover:bg-purple-800/50 dark:text-purple-300 transition-colors"
+                >
+                  Turn off lights (floor 5)
+                </button>
+                <button
+                  onClick={() => sendMessage("Set HVAC to 22°C")}
+                  className="text-xs px-3 py-1.5 rounded-full bg-orange-100 hover:bg-orange-200 text-orange-800 dark:bg-orange-900/30 dark:hover:bg-orange-800/50 dark:text-orange-300 transition-colors"
+                >
+                  Set HVAC (22°C)
                 </button>
               </div>
             </div>
