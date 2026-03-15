@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 import BuildingModel3D, { type FloorData } from "@/components/BuildingModel3D";
 import FloorDetailDialog from "@/components/FloorDetailDialog";
 import FloorPlan from "@/components/FloorPlan";
+import AIAssistant from "@/components/AIAssistant";
 import { getBuildingVisualization, generateMockBuildingData, convertToFloorData, type FloorSummary } from "@/lib/api";
 
 const buildingConfigs: Record<BuildingType, { name: string; floors: number; baseMetrics: Partial<FloorResources> }> = {

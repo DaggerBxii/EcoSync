@@ -27,11 +27,21 @@ interface Zone {
 }
 
 interface FloorPlanProps {
-  floorNumber: number;
-  selectedResource: ResourceKey;
-  zones: Zone[];
-  onZoneClick: (zone: Zone) => void;
-  selectedZone: Zone | null;
+  floorNumber?: number;
+  selectedResource?: ResourceKey;
+  zones?: Zone[];
+  onZoneClick?: (zone: Zone) => void;
+  selectedZone?: Zone | null;
+  // Alternative props for simple usage
+  floor?: number;
+  data?: {
+    electricity: number;
+    hvac: number;
+    water: number;
+    lighting: number;
+  };
+  onClose?: () => void;
+  buildingName?: string;
 }
 
 interface ResourceFlowLine {
@@ -41,7 +51,64 @@ interface ResourceFlowLine {
   value: number;
 }
 
-export default function FloorPlan({ floorNumber, selectedResource, zones, onZoneClick, selectedZone }: FloorPlanProps) {
+export default function FloorPlan({
+  floorNumber,
+  selectedResource = "electricity",
+  zones = [],
+  onZoneClick,
+  selectedZone,
+  // Alternative props
+  floor,
+  data,
+  onClose,
+  buildingName = "Building"
+}: FloorPlanProps) {
+  // Use floor if floorNumber not provided
+  const effectiveFloorNumber = floorNumber ?? floor ?? 1;
+  
+  // If onClose is provided, render simplified modal view
+  if (onClose) {
+    return (
+      <div className="fixed inset-0 z-50 bg-background/95 backdrop-blur-sm">
+        <div className="h-full flex flex-col">
+          <div className="flex items-center justify-between p-4 border-b">
+            <h2 className="text-xl font-bold">{buildingName} - Floor {effectiveFloorNumber}</h2>
+            <button onClick={onClose} className="p-2 rounded-lg hover:bg-muted">Close</button>
+          </div>
+          <div className="flex-1 p-8 flex items-center justify-center">
+            <div className="text-center">
+              <p className="text-muted-foreground">Floor plan visualization</p>
+              {data && (
+                <div className="mt-4 grid grid-cols-2 gap-4">
+                  <div className="p-4 bg-muted rounded-lg">
+                    <Zap className="w-6 h-6 mx-auto mb-2 text-yellow-500" />
+                    <p className="text-sm text-muted-foreground">Electricity</p>
+                    <p className="text-xl font-bold">{data.electricity.toFixed(1)} kW</p>
+                  </div>
+                  <div className="p-4 bg-muted rounded-lg">
+                    <Thermometer className="w-6 h-6 mx-auto mb-2 text-red-500" />
+                    <p className="text-sm text-muted-foreground">HVAC</p>
+                    <p className="text-xl font-bold">{data.hvac.toFixed(1)}°C</p>
+                  </div>
+                  <div className="p-4 bg-muted rounded-lg">
+                    <Droplets className="w-6 h-6 mx-auto mb-2 text-blue-500" />
+                    <p className="text-sm text-muted-foreground">Water</p>
+                    <p className="text-xl font-bold">{data.water.toFixed(1)} L/min</p>
+                  </div>
+                  <div className="p-4 bg-muted rounded-lg">
+                    <Lightbulb className="w-6 h-6 mx-auto mb-2 text-purple-500" />
+                    <p className="text-sm text-muted-foreground">Lighting</p>
+                    <p className="text-xl font-bold">{data.lighting.toFixed(1)}%</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const [hoveredZone, setHoveredZone] = useState<string | null>(null);
 
   // Calculate total metrics for the floor
@@ -214,7 +281,7 @@ export default function FloorPlan({ floorNumber, selectedResource, zones, onZone
               return (
                 <div
                   key={zone.id}
-                  onClick={() => onZoneClick(zone)}
+                  onClick={() => onZoneClick?.(zone)}
                   onMouseEnter={() => setHoveredZone(zone.id)}
                   onMouseLeave={() => setHoveredZone(null)}
                   className={`absolute cursor-pointer transition-all duration-300 border-2 rounded-lg shadow-md hover:shadow-lg ${
