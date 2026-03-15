@@ -669,11 +669,15 @@ def chatbot_message(request: dict):
         user_id = request.get("user_id", "default_user")
         message = request.get("message", "")
         
+        print(f"Chatbot request: user_id={user_id}, message={message[:50]}...")
+        
         if not message:
             raise HTTPException(status_code=400, detail="Message is required")
         
         # Use the new chatbot engine
         response = chatbot_engine.process_message(user_id, message)
+        
+        print(f"Chatbot response: {response.message[:50]}...")
         
         return {
             "success": True,
@@ -686,6 +690,9 @@ def chatbot_message(request: dict):
     except HTTPException:
         raise
     except Exception as e:
+        import traceback
+        print(f"Chatbot error: {str(e)}")
+        print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Error processing chatbot message: {str(e)}")
 
 
