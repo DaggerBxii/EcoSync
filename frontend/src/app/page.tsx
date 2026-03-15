@@ -2,11 +2,16 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Building2, Sun, Moon, Activity, ArrowRight, TrendingUp, Users, DollarSign, Clock } from "lucide-react";
+import { Building2, Sun, Moon, Activity, ArrowRight, TrendingUp, Users, DollarSign, Clock, Atom } from "lucide-react";
 import { useTheme } from "next-themes";
+import { BeforeAfterChart } from "@/components/BeforeAfterChart";
+import RegistrationForm from "@/components/RegistrationForm";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import EcoSyncWebSocket from "./EcoSyncWebSocket";
 
 export default function HomePage() {
   const [showDemoButton, setShowDemoButton] = useState(false);
+  const [showRegisterDialog, setShowRegisterDialog] = useState(false);
   const { theme, setTheme } = useTheme();
 
   useEffect(() => {
@@ -38,7 +43,7 @@ export default function HomePage() {
             <div className="flex items-center justify-between h-16">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-green-600 to-green-400 flex items-center justify-center shadow-lg">
-                  <Activity className="w-6 h-6 text-white" />
+                  <Atom className="w-6 h-6 text-white" />
                 </div>
                 <span className="text-xl font-bold">Synclo</span>
               </div>
@@ -156,54 +161,28 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* Impact Section - Before/After */}
-        <section id="impact" className="py-20 px-4">
+        {/* Live EcoSync Data Section */}
+        <section id="demo" className="py-20 px-4">
           <div className="max-w-4xl mx-auto">
             <div className="text-center mb-12">
               <h2 className="text-3xl md:text-5xl font-extrabold mb-4">
-                Impact of <span className="text-green-600">Synclo</span>
+                Live <span className="text-green-600">EcoSync</span> Data
               </h2>
-              <p className="text-xl text-muted-foreground">See the difference intelligent synchronization makes</p>
+              <p className="text-xl text-muted-foreground">Real-time building metrics powered by AI</p>
             </div>
+            <EcoSyncWebSocket />
+          </div>
+        </section>
 
-            <div className="bg-background rounded-3xl p-8 md:p-12 shadow-2xl border">
-              <div className="grid md:grid-cols-2 gap-8 mb-8">
-                {/* Before Synclo */}
-                <div className="text-center">
-                  <h3 className="text-lg font-semibold text-muted-foreground mb-4">Before Synclo</h3>
-                  <div className="relative h-64 bg-muted rounded-2xl overflow-hidden">
-                    <div className="absolute bottom-0 left-0 right-0 bg-muted-foreground/50 transition-all duration-1000" style={{ height: "38%" }} />
-                    <div className="absolute bottom-4 left-0 right-0 text-center">
-                      <span className="text-4xl font-bold text-muted-foreground">38%</span>
-                    </div>
-                  </div>
-                  <p className="text-sm text-muted-foreground mt-4">Load-window alignment</p>
-                </div>
-
-                {/* After Synclo */}
-                <div className="text-center">
-                  <h3 className="text-lg font-semibold text-green-600 mb-4">After Synclo</h3>
-                  <div className="relative h-64 bg-muted rounded-2xl overflow-hidden">
-                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-green-600 to-green-400 transition-all duration-1000" style={{ height: "76%" }} />
-                    <div className="absolute bottom-4 left-0 right-0 text-center">
-                      <span className="text-4xl font-bold text-green-600">76%</span>
-                    </div>
-                  </div>
-                  <p className="text-sm text-muted-foreground mt-4">Load-window alignment</p>
-                </div>
-              </div>
-
-              <div className="text-center">
-                <p className="text-lg mb-6">
-                  Synclo increased load-window alignment from <span className="font-bold">38%</span> to <span className="font-bold text-green-600">76%</span>
-                </p>
-                <Link href="/buildings">
-                  <button className="px-6 py-3 rounded-full border border-green-600 text-green-600 font-medium hover:bg-green-50 transition-all">
-                    See it in action →
-                  </button>
-                </Link>
-              </div>
-            </div>
+        {/* Impact Section - Before/After */}
+        <section id="impact" className="py-20 px-4">
+          <div className="max-w-4xl mx-auto">
+            <BeforeAfterChart
+              beforeValue={38}
+              afterValue={76}
+              showButton={true}
+              onButtonClick={() => window.location.href = "/buildings"}
+            />
           </div>
         </section>
 
@@ -242,13 +221,27 @@ export default function HomePage() {
             <p className="text-xl text-muted-foreground mb-8">
               Register your interest and our team will reach out within 24 hours
             </p>
-            <Link href="#register">
-              <button className="px-8 py-4 bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600 text-white font-semibold rounded-full transition-all shadow-xl hover:shadow-2xl hover:scale-105">
-                Register Interest
-              </button>
-            </Link>
+            <button
+              onClick={() => setShowRegisterDialog(true)}
+              className="px-8 py-4 bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600 text-white font-semibold rounded-full transition-all shadow-xl hover:shadow-2xl hover:scale-105"
+            >
+              Register Interest
+            </button>
           </div>
         </section>
+
+        {/* Registration Dialog */}
+        <Dialog open={showRegisterDialog} onOpenChange={setShowRegisterDialog}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Register Your Interest</DialogTitle>
+              <DialogDescription>
+                Fill out the form below and our team will reach out within 24 hours.
+              </DialogDescription>
+            </DialogHeader>
+            <RegistrationForm />
+          </DialogContent>
+        </Dialog>
 
         {/* Footer */}
         <footer className="py-12 px-4 bg-black text-white">
@@ -257,7 +250,7 @@ export default function HomePage() {
               <div>
                 <div className="flex items-center gap-3 mb-4">
                   <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-green-600 to-green-400 flex items-center justify-center">
-                    <Activity className="w-6 h-6 text-white" />
+                    <Atom className="w-6 h-6 text-white" />
                   </div>
                   <span className="text-xl font-bold">Synclo</span>
                 </div>
@@ -299,7 +292,7 @@ export default function HomePage() {
         {showDemoButton && (
           <Link href="/buildings">
             <button className="fixed bottom-8 right-8 z-50 px-6 py-4 bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600 text-white font-semibold rounded-full shadow-2xl hover:shadow-3xl transition-all hover:scale-110 flex items-center gap-3">
-              <Activity className="w-6 h-6" />
+              <Atom className="w-6 h-6" />
               Live Demo
             </button>
           </Link>

@@ -1,10 +1,13 @@
 "use client";
 
-import { useState, useEffect, use } from "react";
+import { useState, useEffect, use, useRef } from "react";
 import Link from "next/link";
-import { Sun, Moon, Activity, ArrowLeft, Play, Pause, ChevronUp, ChevronDown } from "lucide-react";
+import {
+  Sun, Moon, Activity, ArrowLeft, Play, Pause, ChevronUp, ChevronDown,
+  Zap, Thermometer, Droplets, Wifi, TrendingUp, BarChart3
+} from "lucide-react";
 import { useTheme } from "next-themes";
-import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell, Label } from "recharts";
 import { getResourceColor, getResourcePercentage, resourceConfigs, type ResourceKey } from "@/lib/colorScales";
 import type { BuildingType, FloorResources, Scenario } from "@/types";
 import { cn } from "@/lib/utils";
@@ -50,11 +53,29 @@ export default function BuildingVisualizationPage({ params }: { params: Promise<
   const [speed, setSpeed] = useState(1);
   const [scenario, setScenario] = useState<Scenario>("normal");
   const [buildingData, setBuildingData] = useState<{ name: string; floors: FloorResources[]; alignmentBefore: number; alignmentAfter: number } | null>(null);
+  const [showGreeting, setShowGreeting] = useState(true);
+  const [greetingStep, setGreetingStep] = useState(0);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setIsLoaded(true);
-    setBuildingData(generateBuildingData(buildingType));
+    const data = generateBuildingData(buildingType);
+    setBuildingData(data);
   }, [buildingType]);
+
+  useEffect(() => {
+    if (isLoaded && buildingData && showGreeting) {
+      // Greeting sequence
+      const timers = [
+        setTimeout(() => setGreetingStep(1), 500),      // Show greeting 1
+        setTimeout(() => setGreetingStep(2), 2000),     // Show greeting 2
+        setTimeout(() => setGreetingStep(3), 4000),     // Show greeting 3
+        setTimeout(() => setGreetingStep(4), 6500),     // Show greeting 4
+        setTimeout(() => setShowGreeting(false), 9000), // Hide greetings
+      ];
+      return () => timers.forEach(clearTimeout);
+    }
+  }, [isLoaded, buildingData, showGreeting]);
 
   const toggleTheme = () => setTheme(theme === "dark" ? "light" : "dark");
 
@@ -89,9 +110,21 @@ export default function BuildingVisualizationPage({ params }: { params: Promise<
     return () => clearInterval(interval);
   }, [isPlaying, speed, scenario]);
 
+  const beforeAfterData = buildingData ? [
+    { name: "Before Synclo", value: buildingData.alignmentBefore, fill: "#94a3b8" },
+    { name: "After Synclo", value: buildingData.alignmentAfter, fill: "#10b981" },
+  ] : [];
+
   if (!isLoaded || !buildingData) return null;
 
   const currentResource = resourceConfigs[selectedResource];
+
+  const totalMetrics = {
+    electricity: buildingData.floors.reduce((sum, f) => sum + f.electricity, 0),
+    hvac: Math.round(buildingData.floors.reduce((sum, f) => sum + f.hvac, 0) / buildingData.floors.length),
+    water: buildingData.floors.reduce((sum, f) => sum + f.water, 0),
+    lighting: Math.round(buildingData.floors.reduce((sum, f) => sum + f.lighting, 0) / buildingData.floors.length),
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -106,6 +139,11 @@ export default function BuildingVisualizationPage({ params }: { params: Promise<
               <span className="text-lg font-bold">{buildingData.name}</span>
             </Link>
             <div className="flex items-center gap-4">
+              <Link href="/chatbot">
+                <button className="px-4 py-2 text-sm font-medium hover:text-green-600 transition-colors">
+                  AI Assistant
+                </button>
+              </Link>
               <button onClick={toggleTheme} className="p-2 rounded-lg hover:bg-muted transition-colors" aria-label="Toggle theme">
                 {theme === "dark" ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
               </button>
@@ -125,6 +163,100 @@ export default function BuildingVisualizationPage({ params }: { params: Promise<
             <h1 className="text-3xl font-extrabold">Real-time Resource Visualization</h1>
             <p className="text-muted-foreground">{buildingData.floors.length} floors • 6 resources monitored</p>
           </div>
+
+          {/* Greeting Messages */}
+          {showGreeting && (
+            <div className="mb-6 space-y-3" aria-live="polite">
+              {greetingStep >= 1 && (
+                <div className="bg-gradient-to-r from-green-50 to-blue-50 dark:from-green-900/20 dark:to-blue-900/20 rounded-2xl p-4 border-2 border-green-300 dark:border-green-700 animate-in fade-in slide-in-from-left-4 duration-500">
+                  <p className="text-lg font-semibold">
+                    👋 Welcome to {buildingData.name}! Would you like to see the analytics for today?
+                  </p>
+                </div>
+              )}
+              {greetingStep >= 2 && (
+                <div className="bg-muted rounded-2xl p-4 border animate-in fade-in slide-in-from-left-4 duration-500">
+                  <p className="font-medium mb-2">📊 These are the initial metrics:</p>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div className="bg-background rounded-xl p-3">
+                      <Zap className="w-5 h-5 text-yellow-600 mb-1" />
+                      <div className="text-xs text-muted-foreground">Electricity</div>
+                      <div className="font-bold">{totalMetrics.electricity} kW</div>
+                    </div>
+                    <div className="bg-background rounded-xl p-3">
+                      <Thermometer className="w-5 h-5 text-red-600 mb-1" />
+                      <div className="text-xs text-muted-foreground">HVAC</div>
+                      <div className="font-bold">{totalMetrics.hvac}°C avg</div>
+                    </div>
+                    <div className="bg-background rounded-xl p-3">
+                      <Droplets className="w-5 h-5 text-blue-600 mb-1" />
+                      <div className="text-xs text-muted-foreground">Water</div>
+                      <div className="font-bold">{totalMetrics.water} L/min</div>
+                    </div>
+                    <div className="bg-background rounded-xl p-3">
+                      <TrendingUp className="w-5 h-5 text-green-600 mb-1" />
+                      <div className="text-xs text-muted-foreground">Lighting</div>
+                      <div className="font-bold">{totalMetrics.lighting}% avg</div>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {greetingStep >= 3 && (
+                <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-2xl p-4 border-2 border-green-400 dark:border-green-600 animate-in fade-in slide-in-from-left-4 duration-500">
+                  <p className="font-medium mb-2">✅ And these are the metrics after using Synclo:</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-green-600 flex items-center justify-center">
+                        <TrendingUp className="w-4 h-4 text-white" />
+                      </div>
+                      <div>
+                        <div className="text-sm text-muted-foreground">Energy Reduction</div>
+                        <div className="font-bold text-green-600">32% decrease</div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-green-600 flex items-center justify-center">
+                        <Thermometer className="w-4 h-4 text-white" />
+                      </div>
+                      <div>
+                        <div className="text-sm text-muted-foreground">HVAC Efficiency</div>
+                        <div className="font-bold text-green-600">28% improvement</div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-green-600 flex items-center justify-center">
+                        <Droplets className="w-4 h-4 text-white" />
+                      </div>
+                      <div>
+                        <div className="text-sm text-muted-foreground">Water Optimization</div>
+                        <div className="font-bold text-green-600">24% savings</div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-green-600 flex items-center justify-center">
+                        <Zap className="w-4 h-4 text-white" />
+                      </div>
+                      <div>
+                        <div className="text-sm text-muted-foreground">Lighting Costs</div>
+                        <div className="font-bold text-green-600">35% reduction</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {greetingStep >= 4 && (
+                <div className="bg-blue-50 dark:bg-blue-900/20 rounded-2xl p-4 border-2 border-blue-300 dark:border-blue-700 animate-in fade-in slide-in-from-left-4 duration-500">
+                  <p className="text-lg font-semibold">
+                    📈 Synclo increased load-window alignment from <span className="text-muted-foreground">{buildingData.alignmentBefore}%</span> to <span className="text-green-600 font-bold">{buildingData.alignmentAfter}%</span>
+                  </p>
+                  <p className="text-sm text-muted-foreground mt-2">
+                    Scroll down to explore the building visualization and select a floor to examine.
+                  </p>
+                </div>
+              )}
+              <div ref={messagesEndRef} />
+            </div>
+          )}
 
           <div className="grid lg:grid-cols-4 gap-6">
             {/* Left: Resource Selector & Floor List */}
@@ -168,6 +300,7 @@ export default function BuildingVisualizationPage({ params }: { params: Promise<
                     onClick={() => selectedFloor && selectedFloor < buildingData.floors.length && setSelectedFloor(selectedFloor + 1)}
                     className="p-2 rounded-lg hover:bg-muted disabled:opacity-50"
                     disabled={!selectedFloor || selectedFloor >= buildingData.floors.length}
+                    aria-label="Next floor"
                   >
                     <ChevronUp className="w-5 h-5" />
                   </button>
@@ -178,11 +311,12 @@ export default function BuildingVisualizationPage({ params }: { params: Promise<
                     onClick={() => selectedFloor && selectedFloor > 1 && setSelectedFloor(selectedFloor - 1)}
                     className="p-2 rounded-lg hover:bg-muted disabled:opacity-50"
                     disabled={!selectedFloor || selectedFloor <= 1}
+                    aria-label="Previous floor"
                   >
                     <ChevronDown className="w-5 h-5" />
                   </button>
                 </div>
-                <div className="space-y-1 max-h-64 overflow-y-auto">
+                <div className="space-y-1 max-h-64 overflow-y-auto" role="listbox" aria-label="Floor selection">
                   {buildingData.floors.map((floor) => (
                     <button
                       key={floor.floor}
@@ -193,6 +327,9 @@ export default function BuildingVisualizationPage({ params }: { params: Promise<
                           ? "bg-green-600 text-white"
                           : "bg-muted hover:bg-muted/80"
                       )}
+                      role="option"
+                      aria-selected={selectedFloor === floor.floor}
+                      tabIndex={0}
                     >
                       Floor {floor.floor}
                     </button>
@@ -226,13 +363,14 @@ export default function BuildingVisualizationPage({ params }: { params: Promise<
                       "w-full py-3 rounded-xl font-semibold transition-all flex items-center justify-center gap-2",
                       isPlaying ? "bg-green-600 text-white" : "bg-muted"
                     )}
+                    aria-label={isPlaying ? "Pause simulation" : "Start simulation"}
                   >
                     {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
                     {isPlaying ? "Pause" : "Start"}
                   </button>
                   <div>
                     <label className="text-xs text-muted-foreground mb-2 block">Speed</label>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2" role="group" aria-label="Simulation speed">
                       {[1, 2, 4].map((s) => (
                         <button
                           key={s}
@@ -241,6 +379,7 @@ export default function BuildingVisualizationPage({ params }: { params: Promise<
                             "flex-1 py-2 rounded-lg text-sm font-medium",
                             speed === s ? "bg-green-600 text-white" : "bg-muted"
                           )}
+                          aria-pressed={speed === s}
                         >
                           {s}x
                         </button>
@@ -253,6 +392,7 @@ export default function BuildingVisualizationPage({ params }: { params: Promise<
                       value={scenario}
                       onChange={(e) => setScenario(e.target.value as Scenario)}
                       className="w-full px-3 py-2 rounded-lg bg-muted border text-sm"
+                      aria-label="Simulation scenario"
                     >
                       <option value="normal">Normal Operations</option>
                       <option value="peakHeat">Peak Heat</option>
@@ -294,11 +434,20 @@ export default function BuildingVisualizationPage({ params }: { params: Promise<
                       <div
                         key={floor.floor}
                         onClick={() => setSelectedFloor(isSelected ? null : floor.floor)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            setSelectedFloor(isSelected ? null : floor.floor);
+                          }
+                        }}
                         className={cn(
-                          "relative cursor-pointer transition-all duration-300 rounded-lg shadow-md overflow-hidden",
+                          "relative cursor-pointer transition-all duration-300 rounded-lg shadow-md overflow-hidden focus:outline-none focus:ring-2 focus:ring-green-600",
                           isSelected && "ring-2 ring-green-600 scale-105 z-10"
                         )}
                         style={{ width: `${280 + (buildingData.floors.length - floor.floor) * 8}px`, backgroundColor: color }}
+                        tabIndex={0}
+                        role="button"
+                        aria-label={`Floor ${floor.floor}, ${currentResource.label} ${value.toFixed(1)} ${currentResource.unit}`}
                       >
                         <div className="h-16 flex items-center px-4">
                           <span className="text-white font-bold text-lg drop-shadow-lg">{floor.floor}F</span>
@@ -356,38 +505,50 @@ export default function BuildingVisualizationPage({ params }: { params: Promise<
               {/* Before/After Impact */}
               <div className="mt-8 p-6 bg-muted/50 rounded-2xl border">
                 <h3 className="text-lg font-bold text-center mb-6">Impact of Synclo on {buildingData.name}</h3>
-                <div className="grid md:grid-cols-2 gap-8 max-w-2xl mx-auto">
-                  <div className="text-center">
-                    <h4 className="text-sm font-semibold text-muted-foreground mb-4">Before Synclo</h4>
-                    <div className="relative h-48 bg-muted rounded-2xl overflow-hidden">
-                      <div className="absolute bottom-0 left-0 right-0 bg-muted-foreground/50 transition-all duration-1000" style={{ height: `${buildingData.alignmentBefore}%` }} />
-                      <div className="absolute bottom-4 left-0 right-0 text-center">
-                        <span className="text-4xl font-bold text-muted-foreground">{buildingData.alignmentBefore}%</span>
-                      </div>
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-3">Load-window alignment</p>
-                  </div>
-                  <div className="text-center">
-                    <h4 className="text-sm font-semibold text-green-600 mb-4">After Synclo</h4>
-                    <div className="relative h-48 bg-muted rounded-2xl overflow-hidden">
-                      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-green-600 to-green-400 transition-all duration-1000" style={{ height: `${buildingData.alignmentAfter}%` }} />
-                      <div className="absolute bottom-4 left-0 right-0 text-center">
-                        <span className="text-4xl font-bold text-green-600">{buildingData.alignmentAfter}%</span>
-                      </div>
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-3">Load-window alignment</p>
-                  </div>
+                <div className="h-64 mb-6">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={beforeAfterData} layout="vertical" barSize={60}>
+                      <XAxis type="number" domain={[0, 100]} hide />
+                      <YAxis
+                        dataKey="name"
+                        type="category"
+                        width={120}
+                        tick={{ fontSize: 14, fontWeight: 600 }}
+                      />
+                      <Bar dataKey="value" radius={[0, 12, 12, 0]}>
+                        {beforeAfterData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.fill} />
+                        ))}
+                      </Bar>
+                      <Label
+                        position="insideEnd"
+                        offset={10}
+                        formatter={(value: any) => `${value}%`}
+                        style={{ fontSize: "24px", fontWeight: "bold", fill: "#10b981" }}
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
                 </div>
-                <div className="text-center mt-6">
+                <div className="text-center">
                   <p className="text-muted-foreground">
                     Synclo increased load-window alignment from <span className="font-bold">{buildingData.alignmentBefore}%</span> to <span className="font-bold text-green-600">{buildingData.alignmentAfter}%</span>
                   </p>
+                  <Link href="/#impact">
+                    <button className="mt-4 px-6 py-3 rounded-full border border-green-600 text-green-600 font-medium hover:bg-green-50 dark:hover:bg-green-900/20 transition-all">
+                      Calculate your savings
+                    </button>
+                  </Link>
                 </div>
               </div>
             </div>
           </div>
         </div>
       </main>
+
+      {/* Accessibility: Live region for scenario changes */}
+      <div aria-live="polite" className="sr-only">
+        Scenario: {scenario}. {selectedFloor ? `Floor ${selectedFloor} ${currentResource.label}: ${buildingData.floors.find(f => f.floor === selectedFloor)?.[selectedResource].toFixed(1)} ${currentResource.unit}` : ""}
+      </div>
     </div>
   );
 }
