@@ -36,9 +36,6 @@ class RemediationEngine:
             ResourceType.WATER: self._remediate_water,
             ResourceType.LIGHTING: self._remediate_lighting,
             ResourceType.ELECTRICITY: self._remediate_electricity,
-            ResourceType.SECURITY: self._remediate_security,
-            ResourceType.FIRE_SAFETY: self._remediate_fire_safety,
-            ResourceType.ELEVATOR: self._remediate_elevator,
             ResourceType.AIR_QUALITY: self._remediate_air_quality,
         }
         
@@ -162,9 +159,6 @@ class RemediationEngine:
             ResourceType.WATER: "Plumber",
             ResourceType.ELECTRICITY: "Electrician",
             ResourceType.LIGHTING: "Electrical Technician",
-            ResourceType.SECURITY: "Security Systems Technician",
-            ResourceType.FIRE_SAFETY: "Fire Safety Technician",
-            ResourceType.ELEVATOR: "Elevator Technician",
             ResourceType.AIR_QUALITY: "HVAC Technician",
         }
         return technician_map.get(resource_type, "Maintenance Technician")
@@ -191,21 +185,6 @@ class RemediationEngine:
                 "company": "PowerTech Electric",
                 "phone": "+1-555-ELEC-911",
                 "email": "emergency@powertech.com"
-            },
-            ResourceType.SECURITY: {
-                "company": "SecureGuard Systems",
-                "phone": "+1-555-SECU-911",
-                "email": "emergency@secureguard.com"
-            },
-            ResourceType.FIRE_SAFETY: {
-                "company": "FireSafe Solutions",
-                "phone": "+1-555-FIRE-911",
-                "email": "emergency@firesafe.com"
-            },
-            ResourceType.ELEVATOR: {
-                "company": "ElevatorTech Pro",
-                "phone": "+1-555-ELEV-911",
-                "email": "emergency@elevatortech.com"
             },
             ResourceType.AIR_QUALITY: {
                 "company": "CleanAir Specialists",
@@ -438,34 +417,7 @@ class RemediationEngine:
             message="Electrical load within normal range",
             requires_escalation=False
         )
-    
-    def _remediate_security(self, resource: Resource, alert: Alert) -> RemediationResult:
-        """Remediate security system issues."""
-        # Security issues typically require immediate human attention
-        return RemediationResult(
-            success=False,
-            message="Security system issue requires immediate technician inspection",
-            requires_escalation=True
-        )
-    
-    def _remediate_fire_safety(self, resource: Resource, alert: Alert) -> RemediationResult:
-        """Remediate fire safety issues."""
-        # Fire safety issues always require immediate human attention
-        return RemediationResult(
-            success=False,
-            message="Fire safety system issue requires immediate technician inspection",
-            requires_escalation=True
-        )
-    
-    def _remediate_elevator(self, resource: Resource, alert: Alert) -> RemediationResult:
-        """Remediate elevator issues."""
-        # Elevator issues typically require technician
-        return RemediationResult(
-            success=False,
-            message="Elevator issue requires certified technician",
-            requires_escalation=True
-        )
-    
+
     def _remediate_air_quality(self, resource: Resource, alert: Alert) -> RemediationResult:
         """
         Remediate air quality issues.

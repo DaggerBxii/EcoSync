@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import EcoSyncWebSocket from "./EcoSyncWebSocket";
 
 // Energy Resource Icons
@@ -155,207 +157,6 @@ const EcoSyncLogo = () => (
   </svg>
 );
 
-// Jamaica Parishes Data with neighborhoods and streets
-const jamaicaParishes = [
-  { 
-    id: "kingston", 
-    name: "Kingston", 
-    energyUsage: 95, 
-    color: "#ef4444",
-    path: "M 520,180 L 540,175 L 550,185 L 545,200 L 525,195 Z",
-    cx: 535, cy: 188,
-    neighborhoods: [
-      { name: "Downtown", energyUsage: 98, streets: ["Kingston St", "Port Royal St", "Harbour St"] },
-      { name: "New Kingston", energyUsage: 92, streets: ["Knutsford Blvd", "Hope Rd", "Oxford Rd"] },
-      { name: "Half Way Tree", energyUsage: 90, streets: ["Constant Spring Rd", "Old Hope Rd"] },
-      { name: "Barbican", energyUsage: 88, streets: ["Barbican Rd", "Weston Rd"] },
-    ]
-  },
-  { 
-    id: "st-andrew", 
-    name: "St. Andrew", 
-    energyUsage: 88, 
-    color: "#f97316",
-    path: "M 540,175 L 570,165 L 590,175 L 580,195 L 550,185 Z",
-    cx: 570, cy: 178,
-    neighborhoods: [
-      { name: "Hope Gardens", energyUsage: 85, streets: ["Hope Rd", "Lady Musgrave Rd"] },
-      { name: "Beverly Hills", energyUsage: 82, streets: ["Beverly Dr", "Elm Tree Dr"] },
-      { name: "Mona", energyUsage: 90, streets: ["Mona Rd", "University Way"] },
-      { name: "Portmore", energyUsage: 86, streets: ["Portmore Pkwy", "Waterford"] },
-    ]
-  },
-  { 
-    id: "st-catherine", 
-    name: "St. Catherine", 
-    energyUsage: 75, 
-    color: "#eab308",
-    path: "M 480,185 L 520,180 L 525,195 L 515,215 L 485,210 Z",
-    cx: 505, cy: 198,
-    neighborhoods: [
-      { name: "Spanish Town", energyUsage: 78, streets: ["Spanish Town Rd", "King St"] },
-      { name: "Portmore", energyUsage: 80, streets: ["Mandela Hwy", "Portmore Pkwy"] },
-      { name: "Old Harbour", energyUsage: 65, streets: ["Old Harbour Rd", "Bridge Rd"] },
-      { name: "Linstead", energyUsage: 68, streets: ["Main St", "Market St"] },
-    ]
-  },
-  { 
-    id: "clarendon", 
-    name: "Clarendon", 
-    energyUsage: 62, 
-    color: "#84cc16",
-    path: "M 450,195 L 485,210 L 475,230 L 445,225 Z",
-    cx: 465, cy: 215,
-    neighborhoods: [
-      { name: "May Pen", energyUsage: 68, streets: ["May Pen Rd", "Circular Rd"] },
-      { name: "Chapelton", energyUsage: 58, streets: ["Chapelton Main Rd"] },
-      { name: "Frankfield", energyUsage: 55, streets: ["Frankfield Rd"] },
-      { name: "Kellits", energyUsage: 52, streets: ["Kellits Main Rd"] },
-    ]
-  },
-  { 
-    id: "manchester", 
-    name: "Manchester", 
-    energyUsage: 58, 
-    color: "#22c55e",
-    path: "M 420,205 L 450,195 L 445,225 L 415,220 Z",
-    cx: 435, cy: 212,
-    neighborhoods: [
-      { name: "Mandeville", energyUsage: 65, streets: ["Mandeville Main St", "Manchester Rd"] },
-      { name: "Christiana", energyUsage: 52, streets: ["Christiana Rd"] },
-      { name: "Balaclava", energyUsage: 48, streets: ["Balaclava Main Rd"] },
-      { name: "Williamsfield", energyUsage: 45, streets: ["Williamsfield Rd"] },
-    ]
-  },
-  { 
-    id: "st-elizabeth", 
-    name: "St. Elizabeth", 
-    energyUsage: 45, 
-    color: "#10b981",
-    path: "M 350,200 L 420,205 L 415,220 L 345,215 Z",
-    cx: 385, cy: 210,
-    neighborhoods: [
-      { name: "Black River", energyUsage: 48, streets: ["Black River Main St"] },
-      { name: "Santa Cruz", energyUsage: 42, streets: ["Santa Cruz Main Rd"] },
-      { name: "Lacovia", energyUsage: 40, streets: ["Lacovia Main Rd"] },
-      { name: "Magotty", energyUsage: 38, streets: ["Magotty Main Rd"] },
-    ]
-  },
-  { 
-    id: "westmoreland", 
-    name: "Westmoreland", 
-    energyUsage: 52, 
-    color: "#14b8a6",
-    path: "M 290,195 L 350,200 L 345,215 L 285,210 Z",
-    cx: 320, cy: 205,
-    neighborhoods: [
-      { name: "Negril", energyUsage: 60, streets: ["Negril Rd", "West End Rd"] },
-      { name: "Savanna-la-Mar", energyUsage: 55, streets: ["Main St", "Market St"] },
-      { name: "Bluefields", energyUsage: 42, streets: ["Bluefields Bay Rd"] },
-      { name: "Grange Hill", energyUsage: 45, streets: ["Grange Hill Main Rd"] },
-    ]
-  },
-  { 
-    id: "hanover", 
-    name: "Hanover", 
-    energyUsage: 38, 
-    color: "#06b6d4",
-    path: "M 260,185 L 290,195 L 285,210 L 255,200 Z",
-    cx: 275, cy: 198,
-    neighborhoods: [
-      { name: "Lucea", energyUsage: 42, streets: ["Lucea Main St", "Market St"] },
-      { name: "Green Island", energyUsage: 38, streets: ["Green Island Main Rd"] },
-      { name: "Shettlewood", energyUsage: 32, streets: ["Shettlewood Rd"] },
-      { name: "Bethel", energyUsage: 30, streets: ["Bethel Main Rd"] },
-    ]
-  },
-  { 
-    id: "st-james", 
-    name: "St. James", 
-    energyUsage: 72, 
-    color: "#0ea5e9",
-    path: "M 300,165 L 360,160 L 370,180 L 310,185 Z",
-    cx: 335, cy: 172,
-    neighborhoods: [
-      { name: "Montego Bay", energyUsage: 80, streets: ["Gloucester Ave", "Howard Blvd"] },
-      { name: "Ironshore", energyUsage: 75, streets: ["Ironshore Dr"] },
-      { name: "Rose Hall", energyUsage: 70, streets: ["Rose Hall Main Rd"] },
-      { name: "Cambridge", energyUsage: 58, streets: ["Cambridge Main Rd"] },
-    ]
-  },
-  { 
-    id: "trelawny", 
-    name: "Trelawny", 
-    energyUsage: 42, 
-    color: "#3b82f6",
-    path: "M 360,160 L 420,155 L 430,175 L 370,180 Z",
-    cx: 395, cy: 168,
-    neighborhoods: [
-      { name: "Falmouth", energyUsage: 48, streets: ["Falmouth Main St", "Market St"] },
-      { name: "Martha Brae", energyUsage: 40, streets: ["Martha Brae Rd"] },
-      { name: "Clark's Town", energyUsage: 38, streets: ["Clark's Town Main Rd"] },
-      { name: "Albert Town", energyUsage: 35, streets: ["Albert Town Main Rd"] },
-    ]
-  },
-  { 
-    id: "st-ann", 
-    name: "St. Ann", 
-    energyUsage: 55, 
-    color: "#6366f1",
-    path: "M 420,155 L 500,150 L 510,170 L 430,175 Z",
-    cx: 465, cy: 162,
-    neighborhoods: [
-      { name: "Ocho Rios", energyUsage: 65, streets: ["Main St", "Ocean Blvd"] },
-      { name: "St. Ann's Bay", energyUsage: 52, streets: ["St. Ann's Bay Main Rd"] },
-      { name: "Runaway Bay", energyUsage: 50, streets: ["Runaway Bay Main Rd"] },
-      { name: "Priory", energyUsage: 45, streets: ["Priory Main Rd"] },
-    ]
-  },
-  { 
-    id: "st-mary", 
-    name: "St. Mary", 
-    energyUsage: 35, 
-    color: "#8b5cf6",
-    path: "M 500,150 L 570,145 L 580,165 L 510,170 Z",
-    cx: 540, cy: 158,
-    neighborhoods: [
-      { name: "Port Maria", energyUsage: 40, streets: ["Port Maria Main St"] },
-      { name: "Oracabessa", energyUsage: 35, streets: ["Oracabessa Bay Rd"] },
-      { name: "Island Gully", energyUsage: 30, streets: ["Island Gully Main Rd"] },
-      { name: "Annotto Bay", energyUsage: 32, streets: ["Annotto Bay Main Rd"] },
-    ]
-  },
-  { 
-    id: "portland", 
-    name: "Portland", 
-    energyUsage: 28, 
-    color: "#a855f7",
-    path: "M 570,145 L 630,145 L 640,165 L 580,165 Z",
-    cx: 605, cy: 155,
-    neighborhoods: [
-      { name: "Port Antonio", energyUsage: 35, streets: ["West St", "East St"] },
-      { name: "Buff Bay", energyUsage: 28, streets: ["Buff Bay Main Rd"] },
-      { name: "Long Bay", energyUsage: 25, streets: ["Long Bay Beach Rd"] },
-      { name: "Moore Town", energyUsage: 22, streets: ["Moore Town Main Rd"] },
-    ]
-  },
-];
-
-// Heatmap intensity color
-const getHeatmapColor = (intensity: number) => {
-  if (intensity >= 80) return "#ef4444";
-  if (intensity >= 60) return "#f97316";
-  if (intensity >= 40) return "#eab308";
-  if (intensity >= 20) return "#84cc16";
-  return "#22c55e";
-};
-
-// Energy Resource Card Component
-function EnergyCard({ name, description, icon, color, availability, status }: { name: string; description: string; icon: React.ReactNode; color: string; availability: number; status: "optimal" | "moderate" | "low" }) {
-import { useState, useEffect } from 'react';
-import Link from 'next/link';
-import OpenStreetMap from '@/components/OpenStreetMap';
-
 // Jamaica parishes with energy data
 const jamaicaParishes = [
   { name: 'Kingston', energy: 92, areas: ['New Kingston', 'Half Way Tree', 'Downtown', 'Kingston 5'] },
@@ -375,12 +176,26 @@ const jamaicaParishes = [
 ];
 
 export default function HomePage() {
+  const router = useRouter();
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [selectedParish, setSelectedParish] = useState<string | null>(null);
   const [selectedArea, setSelectedArea] = useState<string | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
   const [visibleSections, setVisibleSections] = useState<Set<string>>(new Set());
   const [showMapButton, setShowMapButton] = useState(false);
+
+  // Navigation handler
+  const onNavigate = useCallback((page: string) => {
+    router.push(`/${page}`);
+  }, [router]);
+
+  // Scroll to section handler
+  const scrollToSection = useCallback((sectionId: string) => {
+    const element = document.getElementById(sectionId);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, []);
 
   // Initialize theme from localStorage on mount
   useEffect(() => {
@@ -525,7 +340,13 @@ export default function HomePage() {
               </div>
             </div>
           </div>
-          <h1 className="text-5xl md:text-7xl font-bold text-black dark:text-white mb-6 fade-in-delay-1">
+        </nav>
+
+        {/* Hero Section */}
+        <section className="pt-32 pb-20 px-4">
+          <div className="max-w-7xl mx-auto">
+            <div className="text-center">
+              <h1 className="text-5xl md:text-7xl font-bold text-black dark:text-white mb-6 fade-in-delay-1">
             Synchronize with<br />
             <span className="text-ecosync-green">Nature&apos;s</span>{" "}
             <span className="text-ecosync-blue">Rhythm</span>
@@ -558,6 +379,11 @@ export default function HomePage() {
         </div>
       </div>
     </section>
+
+        <FeaturesSection />
+        <DashboardSection />
+      </div>
+    </div>
   );
 }
 
@@ -667,353 +493,6 @@ function DashboardSection() {
     </section>
   );
 }
-
-// Location Permission Modal
-function LocationPermissionModal({ isOpen, onAllow, onDeny }: { isOpen: boolean; onAllow: () => void; onDeny: () => void }) {
-  if (!isOpen) return null;
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onDeny} />
-      <div className="relative bg-white dark:bg-gray-800 rounded-3xl p-8 max-w-lg w-full mx-4 shadow-2xl">
-        <button onClick={onDeny} className="absolute top-4 right-4 p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"><CloseIcon /></button>
-        <div className="text-center mb-6">
-          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-ecosync-green-pale dark:bg-ecosync-green-pale/20 flex items-center justify-center"><LocationIcon /></div>
-          <h3 className="text-2xl font-bold text-black dark:text-white mb-2">Enable Location Access</h3>
-          <p className="text-gray-600 dark:text-gray-300">Allow EcoSync to access your location to show personalized energy heatmaps for your specific area in Jamaica.</p>
-        </div>
-        <div className="bg-ecosync-green-pale dark:bg-ecosync-green-pale/20 rounded-xl p-4 mb-6">
-          <h4 className="font-semibold text-ecosync-green mb-2">What we use your location for:</h4>
-          <ul className="text-sm text-gray-700 dark:text-gray-300 space-y-2">
-            <li>• Detect your parish and neighborhood</li>
-            <li>• Show localized energy consumption heatmaps</li>
-            <li>• Provide personalized efficiency recommendations</li>
-            <li>• Your location is processed locally and never stored</li>
-          </ul>
-        </div>
-        <div className="flex gap-4">
-          <button onClick={onDeny} className="flex-1 px-6 py-3 border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 font-semibold rounded-full hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">Not Now</button>
-          <button onClick={onAllow} className="flex-1 px-6 py-3 bg-ecosync-green text-white font-semibold rounded-full hover:bg-ecosync-green-dark transition-colors">Allow Location</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// Interactive Jamaica Heatmap Component with Real Map
-function JamaicaHeatmap({
-  selectedParish,
-  selectedNeighborhood,
-  onParishSelect,
-  onNeighborhoodSelect,
-  zoomLevel,
-  onZoomChange,
-  userLocation,
-}: {
-  selectedParish: string | null;
-  selectedNeighborhood: string | null;
-  onParishSelect: (parishId: string | null) => void;
-  onNeighborhoodSelect: (neighborhoodName: string | null) => void;
-  zoomLevel: number;
-  onZoomChange: (level: number) => void;
-  userLocation: { parish: string; neighborhood: string } | null;
-}) {
-  const [hoveredParish, setHoveredParish] = useState<string | null>(null);
-  const [hoveredNeighborhood, setHoveredNeighborhood] = useState<string | null>(null);
-
-  const handleParishClick = (parishId: string) => {
-    if (selectedParish === parishId) {
-      onParishSelect(null);
-      onNeighborhoodSelect(null);
-      onZoomChange(1);
-    } else {
-      onParishSelect(parishId);
-      onNeighborhoodSelect(null);
-      onZoomChange(2);
-    }
-  };
-
-  const handleNeighborhoodClick = (neighborhoodName: string) => {
-    if (selectedNeighborhood === neighborhoodName) {
-      onNeighborhoodSelect(null);
-      onZoomChange(2);
-    } else {
-      onNeighborhoodSelect(neighborhoodName);
-      onZoomChange(3);
-    }
-  };
-
-  const selectedParishData = selectedParish ? jamaicaParishes.find((p) => p.id === selectedParish) : null;
-  const selectedNeighborhoodData = selectedParishData?.neighborhoods.find((n) => n.name === selectedNeighborhood);
-
-  // Jamaica outline path for realistic map
-  const jamaicaOutline = "M 100,140 C 80,135 60,130 50,125 C 40,120 35,115 40,110 C 50,100 70,95 100,92 C 130,90 170,88 210,88 C 250,88 290,90 330,92 C 370,95 410,98 450,100 C 490,102 530,102 570,100 C 610,98 640,95 660,95 C 680,95 690,100 685,110 C 675,125 650,140 615,155 C 575,170 525,185 470,195 C 415,205 355,210 300,208 C 245,205 195,195 155,180 C 125,168 105,155 100,140 Z";
-
-  return (
-    <div className="relative">
-      {/* Map Controls */}
-      <div className="absolute top-4 right-4 z-10 flex flex-col gap-2">
-        <button onClick={() => onZoomChange(Math.min(3, zoomLevel + 1))} className="p-2 bg-white dark:bg-gray-800 rounded-lg shadow-lg hover:bg-ecosync-green-pale dark:hover:bg-gray-700 transition-colors" disabled={zoomLevel >= 3}>
-          <ZoomInIcon />
-        </button>
-        <button onClick={() => onZoomChange(Math.max(1, zoomLevel - 1))} className="p-2 bg-white dark:bg-gray-800 rounded-lg shadow-lg hover:bg-ecosync-green-pale dark:hover:bg-gray-700 transition-colors" disabled={zoomLevel <= 1}>
-          <ZoomOutIcon />
-        </button>
-        <button onClick={() => { onParishSelect(null); onNeighborhoodSelect(null); onZoomChange(1); }} className="p-2 bg-white dark:bg-gray-800 rounded-lg shadow-lg hover:bg-ecosync-green-pale dark:hover:bg-gray-700 transition-colors">
-          <HomeIcon />
-        </button>
-      </div>
-        </nav>
-
-        {/* Hero Section */}
-        <section className="pt-32 pb-20 px-4">
-          <div className="max-w-7xl mx-auto">
-            <div className="text-center mb-12 fade-in-up">
-              <h1 className="text-4xl md:text-6xl font-extrabold text-gray-900 dark:text-white mb-4 leading-tight">
-                Conserve Energy.<br />
-                <span className="text-green-600">Protect Our Future.</span>
-              </h1>
-              <p className="text-lg md:text-xl text-gray-600 dark:text-gray-400 max-w-3xl mx-auto mb-8">
-                Join the movement to reduce energy waste and build a sustainable tomorrow. 
-                Track, analyze, and optimize your energy consumption with AI-powered insights.
-              </p>
-              
-              {/* Choose Your Perspective Button */}
-              <div className="mb-8 fade-in-up stagger-1">
-                <Link
-                  href="/perspectives"
-                  className="inline-block px-8 py-4 bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700 text-white font-bold rounded-full transition-all shadow-xl hover:shadow-2xl hover:scale-105"
-                >
-                  Choose Your Perspective →
-                </Link>
-              </div>
-              
-              <div className="flex flex-wrap justify-center gap-4 fade-in-up stagger-2">
-                <Link href="/auth/register" className="px-8 py-4 bg-green-600 hover:bg-green-700 text-white font-bold rounded-full transition-all shadow-lg hover:shadow-xl hover:scale-105">
-                  Start Saving Today →
-                </Link>
-                <button
-                  onClick={() => document.getElementById('dashboard')?.scrollIntoView({ behavior: 'smooth' })}
-                  className="px-8 py-4 bg-gray-100 dark:bg-gray-900 hover:bg-gray-200 dark:hover:bg-gray-800 text-gray-900 dark:text-white font-bold rounded-full transition-all hover:scale-105"
-                >
-                  View Jamaica Energy Map
-                </button>
-                <a
-                  href="#dashboard"
-                  className="px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold rounded-full transition-all shadow-lg hover:shadow-xl hover:scale-105 flex items-center gap-2"
-                >
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
-                  </svg>
-                  Explore Interactive Map
-                </a>
-              </div>
-            </div>
-
-            {/* Stats */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-8 max-w-4xl mx-auto mb-16">
-              {[
-                { value: '40%', label: 'Average Energy Savings', icon: '📉' },
-                { value: '1M+', label: 'Tons CO₂ Prevented', icon: '🌍' },
-                { value: '50K+', label: 'Active Users', icon: '👥' },
-                { value: '24/7', label: 'Real-Time Monitoring', icon: '⚡' },
-              ].map((stat, i) => (
-                <div key={i} className="text-center p-6 bg-gray-50 dark:bg-gray-900 rounded-2xl hover-lift">
-                  <div className="text-4xl mb-2 float">{stat.icon}</div>
-                  <div className="text-3xl font-bold text-green-600 mb-1 scale-in" style={{ animationDelay: `${i * 0.1}s` }}>{stat.value}</div>
-                  <div className="text-sm text-gray-600 dark:text-gray-400">{stat.label}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Choose Your Perspective Section */}
-          <section id="perspectives" className="py-16 px-4">
-            <div className="max-w-7xl mx-auto">
-              <div className="text-center mb-12 fade-in-up">
-                <h2 className="text-3xl md:text-5xl font-extrabold text-gray-900 dark:text-white mb-4">
-                  Select Your <span className="text-green-600">Perspective</span>
-                </h2>
-                <p className="text-xl text-gray-600 dark:text-gray-400">
-                  Choose the dashboard that matches your energy management needs
-                </p>
-              </div>
-              <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
-                {/* Consumer Card */}
-                <Link href="/consumer" className="group bg-gradient-to-br from-green-50 to-white dark:from-gray-900 dark:to-gray-800 rounded-3xl p-8 shadow-lg border-2 border-green-200 dark:border-green-800 hover:shadow-2xl hover:scale-105 transition-all card-hover fade-in-up stagger-1">
-                  <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-green-500 to-green-400 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform rotate-slow">
-                    <svg className="w-8 h-8 text-white" viewBox="0 0 24 24" fill="none">
-                      <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                      <path d="M9 22V12h6v10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                  </div>
-                  <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">Consumer</h3>
-                  <p className="text-green-600 font-medium mb-4">Home & Residential</p>
-                  <p className="text-gray-600 dark:text-gray-400 mb-6">
-                    Optimize your home energy usage with AI-powered insights for HVAC, appliances, and solar panels.
-                  </p>
-                  <ul className="space-y-2 mb-6">
-                    {['Real-time monitoring', 'Solar optimization', 'Smart scheduling', 'Carbon tracking'].map((item, i) => (
-                      <li key={i} className="flex items-center gap-2 text-gray-700 dark:text-gray-300 fade-in-left">
-                        <span className="w-2 h-2 rounded-full bg-green-600" />
-                        {item}
-                      </li>
-                    ))}
-                  </ul>
-                  <div className="w-full py-3 bg-gradient-to-r from-green-600 to-green-500 text-white font-semibold rounded-full text-center group-hover:shadow-lg transition-all">
-                    Enter Consumer Dashboard →
-                  </div>
-                </Link>
-
-                {/* Enterprise Card */}
-                <Link href="/enterprise" className="group bg-gradient-to-br from-blue-50 to-white dark:from-gray-900 dark:to-gray-800 rounded-3xl p-8 shadow-lg border-2 border-blue-200 dark:border-blue-800 hover:shadow-2xl hover:scale-105 transition-all card-hover fade-in-up stagger-2">
-                  <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-blue-400 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform rotate-slow">
-                    <svg className="w-8 h-8 text-white" viewBox="0 0 24 24" fill="none">
-                      <path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                  </div>
-                  <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">Enterprise</h3>
-                  <p className="text-blue-600 font-medium mb-4">Commercial Buildings</p>
-                  <p className="text-gray-600 dark:text-gray-400 mb-6">
-                    Manage energy across multiple zones with compliance tracking and automated HVAC control.
-                  </p>
-                  <ul className="space-y-2 mb-6">
-                    {['Zone management', 'HVAC optimization', 'Compliance tracking', 'Multi-building'].map((item, i) => (
-                      <li key={i} className="flex items-center gap-2 text-gray-700 dark:text-gray-300 fade-in-left">
-                        <span className="w-2 h-2 rounded-full bg-blue-600" />
-                        {item}
-                      </li>
-                    ))}
-                  </ul>
-                  <div className="w-full py-3 bg-gradient-to-r from-blue-600 to-blue-500 text-white font-semibold rounded-full text-center group-hover:shadow-lg transition-all">
-                    Enter Enterprise Dashboard →
-                  </div>
-                </Link>
-
-                {/* Data Center Card */}
-                <Link href="/datacenter" className="group bg-gradient-to-br from-purple-50 to-white dark:from-gray-900 dark:to-gray-800 rounded-3xl p-8 shadow-lg border-2 border-purple-200 dark:border-purple-800 hover:shadow-2xl hover:scale-105 transition-all card-hover fade-in-up stagger-3">
-                  <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-500 to-purple-400 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform rotate-slow">
-                    <svg className="w-8 h-8 text-white" viewBox="0 0 24 24" fill="none">
-                      <rect x="2" y="2" width="20" height="8" rx="2" stroke="currentColor" strokeWidth="2"/>
-                      <rect x="2" y="14" width="20" height="8" rx="2" stroke="currentColor" strokeWidth="2"/>
-                      <path d="M6 6h.01M10 6h.01M6 18h.01M10 18h.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                    </svg>
-                  </div>
-                  <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">Data Center</h3>
-                  <p className="text-purple-600 font-medium mb-4">Compute Facilities</p>
-                  <p className="text-gray-600 dark:text-gray-400 mb-6">
-                    Optimize PUE, schedule jobs based on renewable availability, and reduce carbon footprint.
-                  </p>
-                  <ul className="space-y-2 mb-6">
-                    {['PUE monitoring', 'Renewable scheduling', 'GPU tracking', 'Carbon-aware compute'].map((item, i) => (
-                      <li key={i} className="flex items-center gap-2 text-gray-700 dark:text-gray-300 fade-in-left">
-                        <span className="w-2 h-2 rounded-full bg-purple-600" />
-                        {item}
-                      </li>
-                    ))}
-                  </ul>
-                  <div className="w-full py-3 bg-gradient-to-r from-purple-600 to-purple-500 text-white font-semibold rounded-full text-center group-hover:shadow-lg transition-all">
-                    Enter Data Center Dashboard →
-                  </div>
-                </Link>
-              </div>
-            </div>
-          </section>
-        </section>
-
-        {/* Jamaica Energy Heatmap Section */}
-        <section id="dashboard" className="py-20 px-4 bg-green-50 dark:bg-gray-900">
-          <div className="max-w-7xl mx-auto">
-            <div className="text-center mb-12 fade-in-up">
-              <h2 className="text-3xl md:text-5xl font-extrabold text-gray-900 dark:text-white mb-4">
-                🇯🇲 Jamaica <span className="text-green-600">Energy Map</span>
-              </h2>
-              <p className="text-xl text-gray-600 dark:text-gray-400">
-                Real-time energy consumption across all 14 parishes
-              </p>
-            </div>
-
-            {/* Jamaica OpenStreetMap with Heatmap */}
-            <div className="fade-in-up">
-              <div className="mb-4 text-center">
-                <div className="inline-flex items-center gap-2 px-6 py-3 bg-green-100 dark:bg-green-900/30 rounded-full mb-4">
-                  <span className="text-2xl">👆</span>
-                  <span className="font-semibold text-green-800 dark:text-green-200">Click any parish to zoom in & view street-level energy data</span>
-                </div>
-              </div>
-              <OpenStreetMap 
-                selectedParish={selectedParish}
-                onParishSelect={setSelectedParish}
-              />
-            </div>
-
-            {/* Parish Selector */}
-            <div className="mb-8 fade-in-down">
-              <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 border border-gray-200 dark:border-gray-700 shadow-lg">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="w-8 h-8 rounded-full bg-green-600 flex items-center justify-center pulse-glow">
-                    <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                    </svg>
-                  </div>
-                  <span className="font-semibold text-gray-900 dark:text-white">Select a Parish:</span>
-                </div>
-                <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
-                  {jamaicaParishes.map((parish, i) => (
-                    <button
-                      key={parish.name}
-                      onClick={() => { setSelectedParish(parish.name); setSelectedArea(null); }}
-                      className={`px-4 py-2 rounded-full text-sm font-medium transition-all hover-lift ${
-                        selectedParish === parish.name
-                          ? 'bg-green-600 text-white shadow-lg scale-105'
-                          : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
-                      }`}
-                      style={{ animationDelay: `${i * 0.05}s` }}
-                    >
-                      {parish.name}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* Heatmap Display */}
-            <div className="bg-white dark:bg-gray-800 rounded-3xl p-8 border border-gray-200 dark:border-gray-700 shadow-2xl fade-in-up">
-              {!selectedParish ? (
-                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
-                  {jamaicaParishes.map((parish, i) => (
-                    <button
-                      key={parish.name}
-                      onClick={() => { setSelectedParish(parish.name); setSelectedArea(null); }}
-                      className="p-6 rounded-2xl heatmap-glow hover:scale-110 transition-all pulse-glow"
-                      style={{ 
-                        background: getHeatGradient(parish.energy),
-                        animationDelay: `${i * 0.1}s`
-                      }}
-                    >
-                      <div className="text-white">
-                        <div className="font-bold text-sm mb-1">{parish.name}</div>
-                        <div className="text-2xl font-extrabold">{parish.energy}%</div>
-                        <div className="text-xs opacity-80">energy usage</div>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              ) : selectedParishData?.areas ? (
-                <div className="space-y-6">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-2xl font-bold text-gray-900 dark:text-white fade-in-left">🇯🇲 {selectedParish} Parish</h3>
-                    <button onClick={() => { setSelectedParish(null); setSelectedArea(null); }} className="text-green-600 hover:underline hover:scale-105 transition-transform">
-                      ← Back to All Parishes
-                    </button>
-                  </div>
-                  <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
-                    {selectedParishData.areas.map((area, i) => {
-                      const areaEnergy = Math.floor(50 + Math.random() * 45);
-                      return (
-                        <button
-                          key={area}
-                          onClick={() => setSelectedArea(area)}
-                          className="p-6 rounded-2xl heatmap-glow hover:scale-105 transition-all"
                           style={{ 
                             background: getHeatGradient(areaEnergy),
                             animationDelay: `${i * 0.1}s`

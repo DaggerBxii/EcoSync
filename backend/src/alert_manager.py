@@ -58,28 +58,6 @@ class AlertManager:
                     "major": AlertSeverity.CRITICAL
                 }
             },
-            ResourceType.SECURITY: {
-                "threshold_breach": True,
-                "monitoring_duration_minutes": 0,  # Immediate escalation
-                "severity_map": {
-                    "any": AlertSeverity.CRITICAL
-                }
-            },
-            ResourceType.FIRE_SAFETY: {
-                "threshold_breach": True,
-                "monitoring_duration_minutes": 0,  # Immediate escalation
-                "severity_map": {
-                    "any": AlertSeverity.CRITICAL
-                }
-            },
-            ResourceType.ELEVATOR: {
-                "threshold_breach": True,
-                "monitoring_duration_minutes": 5,
-                "severity_map": {
-                    "minor": AlertSeverity.WARNING,
-                    "major": AlertSeverity.CRITICAL
-                }
-            },
             ResourceType.AIR_QUALITY: {
                 "threshold_breach": True,
                 "monitoring_duration_minutes": 15,
@@ -235,19 +213,7 @@ class AlertManager:
             else:
                 title = f"Lighting Failure in {resource.name}"
                 description = f"Lighting level at {current}%, below required minimum of {threshold}%. Possible electrical issue."
-        
-        elif resource.resource_type == ResourceType.SECURITY:
-            title = f"Security System Alert - {resource.name}"
-            description = f"Security system in {resource.zone_id} requires immediate attention. System may be compromised."
-        
-        elif resource.resource_type == ResourceType.FIRE_SAFETY:
-            title = f"Fire Safety System Alert - {resource.name}"
-            description = f"Fire safety system in {resource.zone_id} has detected an issue. Immediate inspection required."
-        
-        elif resource.resource_type == ResourceType.ELEVATOR:
-            title = f"Elevator Issue - {resource.name}"
-            description = f"Elevator in {resource.zone_id} is experiencing problems. Technician inspection required."
-        
+
         elif resource.resource_type == ResourceType.AIR_QUALITY:
             title = f"Poor Air Quality in {resource.name}"
             description = f"Air quality metrics in {resource.zone_id} are outside acceptable ranges. Ventilation system check required."

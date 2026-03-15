@@ -23,8 +23,9 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).parent))
 
 from ai_module import ai_brain
+from chatbot import chatbot
 from models import (
-    ResourceType, AlertStatus, AlertSeverity, data_store,
+    ResourceType, AlertStatus, AlertSeverity, ResourceStatus, data_store,
     Zone, Resource, Alert
 )
 from alert_manager import alert_manager
@@ -173,6 +174,220 @@ def get_zone_metrics(zone_id: str):
         "floor": zone.floor,
         "area_sqft": zone.area_sqft
     }
+
+
+# ==================== Building Visualization Endpoints ====================
+
+@app.get("/api/building/overview")
+def get_building_overview():
+    """
+    Get complete building overview with floors and efficiency metrics.
+    This endpoint provides all data needed to render a building visualization.
+    """
+    overview = data_store.get_building_overview()
+    return overview.to_dict()
+
+@app.get("/api/building/floors")
+def get_building_floors():
+    """Get list of all floors in the building with summary data."""
+    floors = data_store.get_floors()
+    floor_summaries = [data_store.get_floor_summary(f).to_dict() for f in floors]
+
+    return {
+        "building_name": data_store.building_name,
+        "total_floors": len(floors),
+        "floors": floor_summaries
+    }
+
+@app.get("/api/building/floors/{floor_number}")
+def get_floor_details(floor_number: int):
+    """
+    Get detailed resource information for a specific floor.
+    Includes all zones, resources, and efficiency metrics for the floor.
+    """
+    floors = data_store.get_floors()
+    if floor_number not in floors:
+        raise HTTPException(status_code=404, detail=f"Floor {floor_number} not found")
+
+    floor_data = data_store.get_floor_resources(floor_number)
+    return floor_data
+
+@app.get("/api/building/efficiency")
+def get_building_efficiency():
+    """
+    Get efficiency metrics for all resource types.
+    Shows how efficiently each resource type is being used across the building.
+    """
+    efficiencies = {}
+    for rt in ResourceType:
+        efficiency = data_store.get_resource_efficiency(rt)
+        if efficiency.total_resources > 0:
+            efficiencies[rt.value] = efficiency.to_dict()
+
+    # Calculate overall building efficiency
+    overview = data_store.get_building_overview()
+
+    return {
+        "building_name": data_store.building_name,
+        "overall_efficiency": overview.overall_efficiency,
+        "resource_efficiencies": efficiencies,
+        "timestamp": overview.timestamp
+    }
+
+@app.get("/api/building/efficiency/{resource_type}")
+def get_resource_type_efficiency(resource_type: str):
+    """
+    Get detailed efficiency metrics for a specific resource type.
+    
+    Resource types: electricity, water, hvac, lighting, air_quality
+    """
+    try:
+        rt = ResourceType(resource_type)
+    except ValueError:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid resource type: {resource_type}. Valid types: {[r.value for r in ResourceType]}"
+        )
+
+    efficiency = data_store.get_resource_efficiency(rt)
+
+    if efficiency.total_resources == 0:
+        return {
+            "resource_type": resource_type,
+            "message": f"No resources of type '{resource_type}' found in the building",
+            "efficiency": None
+        }
+
+    # Get individual resource details
+    resources = data_store.get_resources_by_type(rt)
+    resource_details = []
+    for r in resources:
+        zone = data_store.get_zone(r.zone_id)
+        resource_details.append({
+            "resource_id": r.resource_id,
+            "name": r.name,
+            "zone_id": r.zone_id,
+            "zone_name": zone.name if zone else "Unknown",
+            "floor": zone.floor if zone else None,
+            "current_value": r.current_value,
+            "target_value": r.target_value,
+            "unit": r.unit,
+            "status": r.status.value,
+            "efficiency": data_store.calculate_resource_efficiency(r)
+        })
+
+    return {
+        "efficiency": efficiency.to_dict(),
+        "resources": resource_details
+    }
+
+@app.get("/api/building/visualization")
+def get_building_visualization():
+    """
+    Get complete data for rendering a 3D/2D building visualization.
+    Includes floor layouts, resource positions, and real-time status.
+    """
+    overview = data_store.get_building_overview()
+
+    # Build visualization data structure
+    visualization_data = {
+        "building": {
+            "name": overview.building_name,
+            "total_floors": overview.total_floors,
+            "overall_efficiency": overview.overall_efficiency,
+            "status": _get_building_status(overview.overall_efficiency, overview.critical_alerts)
+        },
+        "floors": [],
+        "resources": [],
+        "alerts": {
+            "active": overview.active_alerts,
+            "critical": overview.critical_alerts
+        },
+        "metrics": {
+            "energy_consumption_kwh": overview.total_energy_consumption,
+            "water_consumption_gal": overview.total_water_consumption,
+            "carbon_footprint_kg": overview.carbon_footprint,
+            "occupancy": overview.total_occupancy,
+            "max_occupancy": overview.total_max_occupancy
+        },
+        "timestamp": overview.timestamp
+    }
+
+    # Add floor data with zone layouts
+    for floor_summary in overview.floors:
+        floor_detail = data_store.get_floor_resources(floor_summary.floor_number)
+
+        floor_viz = {
+            "floor_number": floor_summary.floor_number,
+            "efficiency": floor_summary.overall_efficiency,
+            "status": _get_floor_status(floor_summary.overall_efficiency, floor_summary.active_alerts),
+            "zones": [],
+            "resources_summary": {
+                "total": floor_summary.total_resources,
+                "by_type": floor_summary.resources_by_type,
+                "efficiency_by_type": floor_summary.efficiency_by_type
+            },
+            "consumption": floor_summary.total_consumption,
+            "occupancy": {
+                "current": floor_summary.occupancy,
+                "max": floor_summary.max_occupancy,
+                "percentage": round((floor_summary.occupancy / floor_summary.max_occupancy) * 100, 1) if floor_summary.max_occupancy > 0 else 0
+            },
+            "area_sqft": floor_summary.area_sqft,
+            "active_alerts": floor_summary.active_alerts
+        }
+
+        # Add zone details with coordinates for rendering
+        for zone_data in floor_detail["zones"]:
+            zone_viz = {
+                "zone_id": zone_data["zone_id"],
+                "name": zone_data["name"],
+                "coordinates": zone_data["coordinates"],
+                "efficiency": round(zone_data["zone_efficiency"], 2),
+                "status": _get_zone_status(zone_data["zone_efficiency"], zone_data["active_alerts"]),
+                "resources": zone_data["resources"],
+                "occupancy": {
+                    "current": zone_data["occupancy"],
+                    "max": zone_data["max_occupancy"]
+                },
+                "active_alerts": zone_data["active_alerts"]
+            }
+            floor_viz["zones"].append(zone_viz)
+
+        visualization_data["floors"].append(floor_viz)
+        visualization_data["resources"].extend(floor_detail["resources"])
+
+    return visualization_data
+
+
+def _get_building_status(efficiency: float, critical_alerts: int) -> str:
+    """Determine building status based on efficiency and alerts."""
+    if critical_alerts > 0 or efficiency < 50:
+        return "critical"
+    elif efficiency < 70:
+        return "warning"
+    else:
+        return "optimal"
+
+
+def _get_floor_status(efficiency: float, active_alerts: int) -> str:
+    """Determine floor status based on efficiency and alerts."""
+    if active_alerts > 2 or efficiency < 50:
+        return "critical"
+    elif active_alerts > 0 or efficiency < 70:
+        return "warning"
+    else:
+        return "optimal"
+
+
+def _get_zone_status(efficiency: float, active_alerts: int) -> str:
+    """Determine zone status based on efficiency and alerts."""
+    if active_alerts > 0 or efficiency < 50:
+        return "critical"
+    elif efficiency < 70:
+        return "warning"
+    else:
+        return "optimal"
 
 
 # ==================== Resource Endpoints ====================
@@ -417,22 +632,71 @@ def simulate_anomaly(
 ):
     """
     Simulate an anomaly for testing/demo purposes.
-    
+
     Example: /api/simulate/anomaly?resource_type=hvac&zone_id=office_a
     """
     alert = ai_brain.simulate_anomaly(resource_type, zone_id)
-    
+
     if not alert:
         raise HTTPException(
             status_code=400,
             detail=f"Could not simulate anomaly for {resource_type} in zone {zone_id}"
         )
-    
+
     return {
         "success": True,
         "message": f"Simulated {resource_type} anomaly in {zone_id}",
         "alert": alert.to_dict()
     }
+
+
+# ==================== Chatbot Endpoints ====================
+
+@app.post("/api/chatbot/message")
+def chatbot_message(user_id: str, message: str):
+    """
+    Process a message from the chatbot user.
+    
+    Request body:
+    {
+        "user_id": "unique_user_identifier",
+        "message": "user's message"
+    }
+    """
+    try:
+        response = chatbot.process_message(user_id, message)
+        return {
+            "success": True,
+            "response": response
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error processing chatbot message: {str(e)}")
+
+
+@app.get("/api/chatbot/init")
+def chatbot_init(user_id: str):
+    """
+    Initialize a chatbot session for a user.
+    
+    Returns initial greeting and conversation options.
+    """
+    try:
+        # Initialize conversation state if not already present
+        if user_id not in chatbot.conversation_state:
+            chatbot.conversation_state[user_id] = {
+                "step": "greeting",
+                "context": {}
+            }
+        
+        # Get the initial greeting
+        greeting_response = chatbot.handle_greeting(user_id, "")
+        
+        return {
+            "success": True,
+            "response": greeting_response
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error initializing chatbot: {str(e)}")
 
 
 # ==================== WebSocket Endpoint ====================
@@ -443,19 +707,19 @@ async def websocket_endpoint(websocket: WebSocket):
     await manager.connect(websocket)
     try:
         print(f"New WebSocket connection established from: {websocket.client}")
-        
+
         # Send initial data
         initial_data = ai_brain.get_building_decision()
         await websocket.send_text(json.dumps(initial_data))
-        
+
         while True:
             # Wait for client messages (can be used for commands)
             data = await websocket.receive_text()
-            
+
             try:
                 message = json.loads(data)
                 action = message.get("action")
-                
+
                 if action == "simulate_anomaly":
                     # Handle simulation request
                     rt = message.get("resource_type", "hvac")
@@ -466,15 +730,27 @@ async def websocket_endpoint(websocket: WebSocket):
                             "type": "simulation_result",
                             "alert": alert.to_dict()
                         }))
-                
+
                 elif action == "get_status":
                     # Send current status
                     status = ai_brain.get_building_decision()
                     await websocket.send_text(json.dumps(status))
+
+                elif action == "chat_message":
+                    # Handle chatbot message
+                    user_id = message.get("user_id", "default_user")
+                    chat_text = message.get("message", "")
                     
+                    if chat_text:
+                        chat_response = chatbot.process_message(user_id, chat_text)
+                        await websocket.send_text(json.dumps({
+                            "type": "chat_response",
+                            "response": chat_response
+                        }))
+
             except json.JSONDecodeError:
                 pass  # Ignore invalid JSON
-            
+
     except WebSocketDisconnect:
         print(f"WebSocket connection disconnected: {websocket.client}")
         manager.disconnect(websocket)
