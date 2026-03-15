@@ -1,19 +1,23 @@
 "use client";
 
-import { useState, useEffect, use, useRef } from "react";
+import { useState, useEffect, use, useRef, Suspense } from "react";
 import Link from "next/link";
 import {
   Sun, Moon, Activity, ArrowLeft, Play, Pause, ChevronUp, ChevronDown,
-  Zap, Thermometer, Droplets, Wifi, TrendingUp, BarChart3
+  Zap, Thermometer, Droplets, Wifi, TrendingUp, BarChart3, Building2
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell, Label } from "recharts";
 import { getResourceColor, getResourcePercentage, resourceConfigs, type ResourceKey } from "@/lib/colorScales";
 import type { BuildingType, FloorResources, Scenario } from "@/types";
 import { cn } from "@/lib/utils";
+import BuildingModel3D, { type FloorData } from "@/components/BuildingModel3D";
+import FloorDetailDialog from "@/components/FloorDetailDialog";
+import FloorPlan from "@/components/FloorPlan";
+import { getBuildingVisualization, generateMockBuildingData, convertToFloorData, type FloorSummary } from "@/lib/api";
 
 const buildingConfigs: Record<BuildingType, { name: string; floors: number; baseMetrics: Partial<FloorResources> }> = {
-  office: { name: "Synclo Tower", floors: 10, baseMetrics: { hvac: 75, lighting: 60, electricity: 250, water: 80, internet: 500, airQuality: 85 } },
+  office: { name: "EcoSync Tower", floors: 10, baseMetrics: { hvac: 75, lighting: 60, electricity: 250, water: 80, internet: 500, airQuality: 85 } },
   datacenter: { name: "DataHub One", floors: 5, baseMetrics: { hvac: 90, lighting: 30, electricity: 450, water: 40, internet: 950, airQuality: 70 } },
   hospital: { name: "Metro General", floors: 12, baseMetrics: { hvac: 80, lighting: 70, electricity: 350, water: 150, internet: 600, airQuality: 90 } },
   campus: { name: "University Hall", floors: 6, baseMetrics: { hvac: 65, lighting: 50, electricity: 180, water: 100, internet: 400, airQuality: 80 } },
@@ -55,12 +59,105 @@ export default function BuildingVisualizationPage({ params }: { params: Promise<
   const [buildingData, setBuildingData] = useState<{ name: string; floors: FloorResources[]; alignmentBefore: number; alignmentAfter: number } | null>(null);
   const [showGreeting, setShowGreeting] = useState(true);
   const [greetingStep, setGreetingStep] = useState(0);
+  const [viewMode, setViewMode] = useState<"3d" | "2d" | "floorplan">("3d");
+  const [showDetailDialog, setShowDetailDialog] = useState(false);
+  const [floorData3D, setFloorData3D] = useState<FloorData[]>([]);
+  const [isLoadingBackend, setIsLoadingBackend] = useState(true);
+  const [selectedZone, setSelectedZone] = useState<any>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Generate zone data for floor plan
+  const generateZoneData = (floorNum: number) => {
+    const config = buildingConfigs[buildingType];
+    const floorIndex = config.floors - floorNum;
+    
+    // Create zones based on floor number
+    return [
+      {
+        id: `zone_${floorNum}_a`,
+        name: `Zone ${floorNum}A`,
+        x: 5,
+        y: 15,
+        width: 40,
+        height: 35,
+        resources: {
+          electricity: 150 + Math.random() * 100,
+          hvac: 20 + Math.random() * 10,
+          water: 30 + Math.random() * 20,
+          lighting: 60 + Math.random() * 30,
+          airQuality: 80 + Math.random() * 15,
+        },
+        occupancy: Math.floor(20 + Math.random() * 30),
+        maxOccupancy: 50,
+        status: Math.random() > 0.7 ? "warning" : "optimal" as any,
+        alerts: Math.random() > 0.8 ? 1 : 0,
+      },
+      {
+        id: `zone_${floorNum}_b`,
+        name: `Zone ${floorNum}B`,
+        x: 50,
+        y: 15,
+        width: 45,
+        height: 35,
+        resources: {
+          electricity: 180 + Math.random() * 120,
+          hvac: 21 + Math.random() * 8,
+          water: 40 + Math.random() * 30,
+          lighting: 65 + Math.random() * 25,
+          airQuality: 75 + Math.random() * 20,
+        },
+        occupancy: Math.floor(25 + Math.random() * 35),
+        maxOccupancy: 60,
+        status: Math.random() > 0.8 ? "critical" : Math.random() > 0.6 ? "warning" : "optimal" as any,
+        alerts: Math.random() > 0.7 ? Math.floor(Math.random() * 2) + 1 : 0,
+      },
+      {
+        id: `zone_${floorNum}_c`,
+        name: `Zone ${floorNum}C`,
+        x: 20,
+        y: 55,
+        width: 60,
+        height: 35,
+        resources: {
+          electricity: 120 + Math.random() * 80,
+          hvac: 19 + Math.random() * 9,
+          water: 25 + Math.random() * 15,
+          lighting: 55 + Math.random() * 35,
+          airQuality: 85 + Math.random() * 10,
+        },
+        occupancy: Math.floor(15 + Math.random() * 25),
+        maxOccupancy: 40,
+        status: "optimal" as any,
+        alerts: 0,
+      },
+    ];
+  };
 
   useEffect(() => {
     setIsLoaded(true);
     const data = generateBuildingData(buildingType);
     setBuildingData(data);
+    
+    // Try to fetch real backend data
+    const fetchBackendData = async () => {
+      try {
+        setIsLoadingBackend(true);
+        const config = buildingConfigs[buildingType];
+        const mockData = generateMockBuildingData(config.floors);
+        const convertedFloors = convertToFloorData(mockData.floors);
+        setFloorData3D(convertedFloors);
+      } catch (error) {
+        console.log("Using mock data (backend not available)");
+        const config = buildingConfigs[buildingType];
+        const mockData = generateMockBuildingData(config.floors);
+        const convertedFloors = convertToFloorData(mockData.floors);
+        setFloorData3D(convertedFloors);
+      } finally {
+        setIsLoadingBackend(false);
+      }
+    };
+    
+    fetchBackendData();
   }, [buildingType]);
 
   useEffect(() => {
@@ -78,6 +175,11 @@ export default function BuildingVisualizationPage({ params }: { params: Promise<
   }, [isLoaded, buildingData, showGreeting]);
 
   const toggleTheme = () => setTheme(theme === "dark" ? "light" : "dark");
+
+  const handleFloorClick = (floorNum: number) => {
+    setSelectedFloor(floorNum);
+    setShowDetailDialog(true);
+  };
 
   // Simulation effect
   useEffect(() => {
@@ -261,6 +363,45 @@ export default function BuildingVisualizationPage({ params }: { params: Promise<
           <div className="grid lg:grid-cols-4 gap-6">
             {/* Left: Resource Selector & Floor List */}
             <div className="lg:col-span-1 space-y-6">
+              {/* View Mode Toggle */}
+              <div className="bg-background rounded-2xl p-4 shadow-lg border">
+                <h3 className="text-sm font-semibold mb-4">View Mode</h3>
+                <div className="flex flex-col gap-2">
+                  <button
+                    onClick={() => setViewMode("3d")}
+                    className={cn(
+                      "w-full py-3 rounded-xl font-semibold transition-all flex items-center justify-center gap-2",
+                      viewMode === "3d" ? "bg-green-600 text-white" : "bg-muted hover:bg-muted/80"
+                    )}
+                  >
+                    <Building2 className="w-5 h-5" />
+                    3D View
+                  </button>
+                  <button
+                    onClick={() => setViewMode("floorplan")}
+                    className={cn(
+                      "w-full py-3 rounded-xl font-semibold transition-all flex items-center justify-center gap-2",
+                      viewMode === "floorplan" ? "bg-green-600 text-white" : "bg-muted hover:bg-muted/80"
+                    )}
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
+                    </svg>
+                    Floor Plan
+                  </button>
+                  <button
+                    onClick={() => setViewMode("2d")}
+                    className={cn(
+                      "w-full py-3 rounded-xl font-semibold transition-all flex items-center justify-center gap-2",
+                      viewMode === "2d" ? "bg-green-600 text-white" : "bg-muted hover:bg-muted/80"
+                    )}
+                  >
+                    <BarChart3 className="w-5 h-5" />
+                    2D View
+                  </button>
+                </div>
+              </div>
+
               {/* Resource Toggles */}
               <div className="bg-background rounded-2xl p-4 shadow-lg border">
                 <h3 className="text-sm font-semibold mb-4">Select Resource</h3>
@@ -408,21 +549,94 @@ export default function BuildingVisualizationPage({ params }: { params: Promise<
             {/* Center: Building Visualization */}
             <div className="lg:col-span-3 bg-background rounded-2xl p-6 shadow-lg border">
               <div className="flex items-center justify-between mb-6">
-                <h3 className="text-lg font-bold">Building Heatmap - {currentResource.label}</h3>
+                <h3 className="text-lg font-bold">
+                  {viewMode === "3d" ? "3D Building Model" : viewMode === "floorplan" ? "Floor Plan Analytics" : "Building Heatmap"} - {currentResource.label}
+                </h3>
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <span className={cn("w-3 h-3 rounded-full", isPlaying ? "bg-green-600 animate-pulse" : "bg-muted")} />
                   {isPlaying ? "Live updating" : "Paused"}
+                  {isLoadingBackend && <span className="ml-2 text-xs">(Loading data...)</span>}
                 </div>
               </div>
 
-              {/* Building Silhouette with Heatmap Floors */}
-              <div className="relative">
-                {/* Roof */}
-                <div className="flex justify-center mb-2">
-                  <div className="w-32 h-8 bg-muted rounded-t-lg relative">
-                    <div className="absolute top-2 left-1/2 -translate-x-1/2 w-16 h-4 bg-muted-foreground/30 rounded-full" />
+              {/* 3D View */}
+              {viewMode === "3d" && (
+                <Suspense fallback={
+                  <div className="h-[600px] flex items-center justify-center">
+                    <div className="text-center">
+                      <Building2 className="w-12 h-12 mx-auto mb-4 animate-pulse text-green-600" />
+                      <p className="text-muted-foreground">Loading 3D model...</p>
+                    </div>
                   </div>
+                }>
+                  <BuildingModel3D
+                    floors={floorData3D}
+                    selectedResource={selectedResource}
+                    selectedFloor={selectedFloor}
+                    onFloorClick={handleFloorClick}
+                    isPlaying={isPlaying}
+                  />
+                </Suspense>
+              )}
+
+              {/* Floor Plan View */}
+              {viewMode === "floorplan" && selectedFloor && (
+                <div className="space-y-6">
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium">Select Floor:</span>
+                      <select
+                        value={selectedFloor}
+                        onChange={(e) => setSelectedFloor(Number(e.target.value))}
+                        className="px-4 py-2 rounded-lg bg-muted border text-sm font-medium"
+                      >
+                        {buildingData?.floors.map((floor) => (
+                          <option key={floor.floor} value={floor.floor}>
+                            Floor {floor.floor}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  
+                  <FloorPlan
+                    floorNumber={selectedFloor}
+                    selectedResource={selectedResource}
+                    zones={generateZoneData(selectedFloor)}
+                    onZoneClick={(zone) => setSelectedZone(zone)}
+                    selectedZone={selectedZone}
+                  />
                 </div>
+              )}
+
+              {/* Floor Plan - No Floor Selected Message */}
+              {viewMode === "floorplan" && !selectedFloor && (
+                <div className="flex flex-col items-center justify-center h-[600px] text-center">
+                  <svg className="w-20 h-20 mb-4 text-muted-foreground/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
+                  </svg>
+                  <h3 className="text-xl font-bold mb-2">Select a Floor to View Plan</h3>
+                  <p className="text-muted-foreground mb-4">
+                    Choose a floor from the selector on the left to see the detailed floor plan with resource analytics
+                  </p>
+                  <button
+                    onClick={() => setSelectedFloor(1)}
+                    className="px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-full transition-all"
+                  >
+                    View Floor 1
+                  </button>
+                </div>
+              )}
+
+              {/* 2D View - Building Silhouette with Heatmap Floors */}
+              {viewMode === "2d" && (
+                <div className="relative">
+                  {/* Roof */}
+                  <div className="flex justify-center mb-2">
+                    <div className="w-32 h-8 bg-muted rounded-t-lg relative">
+                      <div className="absolute top-2 left-1/2 -translate-x-1/2 w-16 h-4 bg-muted-foreground/30 rounded-full" />
+                    </div>
+                  </div>
 
                 {/* Floors */}
                 <div className="flex flex-col-reverse gap-1 items-center">
@@ -467,6 +681,7 @@ export default function BuildingVisualizationPage({ params }: { params: Promise<
                   </div>
                 </div>
               </div>
+              )}
 
               {/* Selected Floor Detail */}
               {selectedFloor && (
@@ -544,6 +759,14 @@ export default function BuildingVisualizationPage({ params }: { params: Promise<
           </div>
         </div>
       </main>
+
+      {/* Floor Detail Dialog */}
+      <FloorDetailDialog
+        floor={floorData3D.find(f => f.floor === selectedFloor) || null}
+        open={showDetailDialog}
+        onOpenChange={setShowDetailDialog}
+        selectedResource={selectedResource}
+      />
 
       {/* Accessibility: Live region for scenario changes */}
       <div aria-live="polite" className="sr-only">
