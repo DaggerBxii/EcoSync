@@ -24,6 +24,7 @@ sys.path.append(str(Path(__file__).parent))
 
 from ai_module import ai_brain
 from chatbot import chatbot
+from chatbot_engine import chatbot_engine, ChatbotResponse
 from ai_controller import ai_controller, ControlAction
 from models import (
     ResourceType, AlertStatus, AlertSeverity, ResourceStatus, data_store,
@@ -656,7 +657,7 @@ def simulate_anomaly(
 @app.post("/api/chatbot/message")
 def chatbot_message(request: dict):
     """
-    Process a message from the chatbot user.
+    Process a message from the chatbot user using the new ChatbotEngine.
 
     Request body:
     {
@@ -671,10 +672,16 @@ def chatbot_message(request: dict):
         if not message:
             raise HTTPException(status_code=400, detail="Message is required")
         
-        response = chatbot.process_message(user_id, message)
+        # Use the new chatbot engine
+        response = chatbot_engine.process_message(user_id, message)
+        
         return {
             "success": True,
-            "response": response
+            "response": response.message,
+            "type": response.type,
+            "options": response.options,
+            "data": response.data,
+            "requires_action": response.requires_action
         }
     except HTTPException:
         raise
@@ -690,22 +697,34 @@ def chatbot_init(user_id: str):
     Returns initial greeting and conversation options.
     """
     try:
-        # Initialize conversation state if not already present
-        if user_id not in chatbot.conversation_state:
-            chatbot.conversation_state[user_id] = {
-                "step": "greeting",
-                "context": {}
-            }
-
-        # Get the initial greeting
-        greeting_response = chatbot.handle_greeting(user_id, "")
-
+        # Reset and get initial greeting
+        response = chatbot_engine.reset_conversation(user_id)
+        
         return {
             "success": True,
-            "response": greeting_response
+            "response": response.message,
+            "type": response.type,
+            "options": response.options
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error initializing chatbot: {str(e)}")
+
+
+@app.post("/api/chatbot/reset")
+def chatbot_reset(request: dict):
+    """Reset a user's conversation."""
+    try:
+        user_id = request.get("user_id", "default_user")
+        response = chatbot_engine.reset_conversation(user_id)
+        
+        return {
+            "success": True,
+            "response": response.message,
+            "type": response.type,
+            "options": response.options
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error resetting chatbot: {str(e)}")
 
 
 # ==================== Natural Language Control Endpoint ====================
@@ -851,7 +870,8 @@ async def websocket_endpoint(websocket: WebSocket):
 
         # Send initial data
         initial_data = ai_brain.get_building_decision()
-        await websocket.send_text(json.dumps(initial_data))
+        formatted_data = _format_for_frontend(initial_data)
+        await websocket.send_text(json.dumps(formatted_data))
 
         while True:
             # Wait for client messages (can be used for commands)
@@ -875,13 +895,14 @@ async def websocket_endpoint(websocket: WebSocket):
                 elif action == "get_status":
                     # Send current status
                     status = ai_brain.get_building_decision()
-                    await websocket.send_text(json.dumps(status))
+                    formatted_status = _format_for_frontend(status)
+                    await websocket.send_text(json.dumps(formatted_status))
 
                 elif action == "chat_message":
                     # Handle chatbot message
                     user_id = message.get("user_id", "default_user")
                     chat_text = message.get("message", "")
-                    
+
                     if chat_text:
                         chat_response = chatbot.process_message(user_id, chat_text)
                         await websocket.send_text(json.dumps({
@@ -898,6 +919,55 @@ async def websocket_endpoint(websocket: WebSocket):
     except Exception as e:
         print(f"WebSocket error: {e}")
         manager.disconnect(websocket)
+
+
+def _format_for_frontend(data: dict) -> dict:
+    """
+    Format the AI brain decision data for the frontend EcoSyncWebSocket component.
+    
+    Transforms the data from the AI module format to the expected frontend format.
+    """
+    # Extract the metrics from the building metrics
+    building_metrics = data.get("metrics", {})
+    
+    # Calculate watts (sum of electricity resources)
+    electricity_resources = data_store.get_resources_by_type(ResourceType.ELECTRICITY)
+    total_watts = sum(r.current_value * 1000 for r in electricity_resources)  # Convert kW to W
+    
+    # Calculate occupancy (sum of all zone occupancies)
+    total_occupancy = sum(zone.occupancy for zone in data_store.get_all_zones())
+    
+    # Calculate carbon saved (based on efficiency improvements)
+    baseline_carbon = building_metrics.get("energy_consumption", 0) * 0.5  # Baseline assumption
+    current_carbon = building_metrics.get("energy_consumption", 0) * 0.4  # Current efficiency
+    carbon_saved = max(0, baseline_carbon - current_carbon)
+    
+    # Calculate scale level based on efficiency score
+    efficiency_score = data.get("efficiency_score", 0)
+    scale_level = efficiency_score / 100.0  # Convert percentage to 0-1 scale
+    
+    formatted_data = {
+        "timestamp": data.get("timestamp", datetime.utcnow().isoformat() + "Z"),
+        "system_status": data.get("system_status", "optimal"),
+        "scale_level": scale_level,
+        "metrics": {
+            "watts": round(total_watts, 2),
+            "occupancy": total_occupancy,
+            "carbon_saved": round(carbon_saved, 3)
+        },
+        "ai_insight": data.get("building_insight", "Building operating normally."),
+        "is_anomaly": data.get("is_anomaly", False),
+        "confidence_score": data.get("confidence_score", 0.85)
+    }
+    
+    # Add optional fields if present in the original data
+    if "unnecessary_usage_detected" in data:
+        formatted_data["unnecessary_usage_detected"] = data["unnecessary_usage_detected"]
+        
+    if "optimization_opportunities" in data:
+        formatted_data["optimization_opportunities"] = data["optimization_opportunities"]
+    
+    return formatted_data
 
 
 # ==================== Background Task ====================

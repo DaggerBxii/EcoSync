@@ -43,6 +43,20 @@ const config: Config = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        ecosync: {
+          green: {
+            DEFAULT: "var(--ecosync-green, #10b981)",
+            dark: "var(--ecosync-green-dark, #059669)",
+            light: "var(--ecosync-green-light, #34d399)",
+            pale: "var(--ecosync-green-pale, #d1fae5)",
+          },
+          blue: {
+            DEFAULT: "var(--ecosync-blue, #3b82f6)",
+            dark: "var(--ecosync-blue-dark, #2563eb)",
+            light: "var(--ecosync-blue-light, #60a5fa)",
+            pale: "var(--ecosync-blue-pale, #dbeafe)",
+          },
+        },
       },
       borderRadius: {
         lg: "var(--radius)",

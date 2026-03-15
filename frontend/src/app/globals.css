@@ -68,6 +68,18 @@
   }
 }
 
+/* EcoSync Brand Colors */
+:root {
+  --ecosync-green: #10b981;
+  --ecosync-green-dark: #059669;
+  --ecosync-green-light: #34d399;
+  --ecosync-green-pale: #d1fae5;
+  --ecosync-blue: #3b82f6;
+  --ecosync-blue-dark: #2563eb;
+  --ecosync-blue-light: #60a5fa;
+  --ecosync-blue-pale: #dbeafe;
+}
+
 /* Synclo Brand Colors */
 :root {
   --synclo-green: #10b981;

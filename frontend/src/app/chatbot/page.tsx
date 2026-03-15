@@ -76,7 +76,7 @@ export default function ChatbotPage() {
 
   const initializeChatbot = async () => {
     try {
-      const response = await fetch(`/api/chatbot/message?user_id=${userId}`);
+      const response = await fetch(`/api/chatbot/init?user_id=${userId}`);
       if (response.ok) {
         const data = await response.json();
         if (data.success) {
@@ -84,12 +84,12 @@ export default function ChatbotPage() {
             {
               id: "1",
               role: "assistant",
-              content: data.response.response,
+              content: data.response,
               timestamp: new Date(),
-              options: data.response.options,
+              options: data.options,
             },
           ]);
-          setCurrentOptions(data.response.options || []);
+          setCurrentOptions(data.options || []);
         }
       }
     } catch (error) {
@@ -138,16 +138,12 @@ export default function ChatbotPage() {
           const assistantMessage: Message = {
             id: (Date.now() + 1).toString(),
             role: "assistant",
-            content: data.response.response,
+            content: data.response,
             timestamp: new Date(),
-            graph: data.response.graph,
-            options: data.response.options,
+            options: data.options,
           };
           setMessages((prev) => [...prev, assistantMessage]);
-          setCurrentOptions(data.response.options || []);
-          if (data.response.report_data) {
-            setReportData(data.response.report_data);
-          }
+          setCurrentOptions(data.options || []);
         }
       } else {
         throw new Error("Failed to get response");

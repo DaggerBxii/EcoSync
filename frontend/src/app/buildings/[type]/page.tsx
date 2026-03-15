@@ -4,7 +4,7 @@ import { useState, useEffect, use, useRef, Suspense } from "react";
 import Link from "next/link";
 import {
   Sun, Moon, Activity, ArrowLeft, Play, Pause, ChevronUp, ChevronDown,
-  Zap, Thermometer, Droplets, Wifi, TrendingUp, BarChart3, Building2
+  Zap, Thermometer, Droplets, Wifi, TrendingUp, BarChart3, Building2, MessageSquare, Maximize2
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell, Label } from "recharts";
@@ -64,6 +64,7 @@ export default function BuildingVisualizationPage({ params }: { params: Promise<
   const [floorData3D, setFloorData3D] = useState<FloorData[]>([]);
   const [isLoadingBackend, setIsLoadingBackend] = useState(true);
   const [selectedZone, setSelectedZone] = useState<any>(null);
+  const [showFloorPlan, setShowFloorPlan] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Generate zone data for floor plan
