@@ -254,6 +254,7 @@ Respond with ONLY the JSON object."""
 
     def _fallback_parse(self, user_input: str, context: Optional[Dict]) -> ParsedCommand:
         """Fallback parser using simple pattern matching."""
+        print(f"[AI_CONTROLLER] _fallback_parse called - user_input: {user_input[:50]}...")
         text = user_input.lower()
         
         # Detect action
@@ -308,6 +309,8 @@ Respond with ONLY the JSON object."""
             needs_clarification = True
             clarification_question = "Which floor would you like to adjust?"
 
+        print(f"[AI_CONTROLLER] Fallback parse result - action: {action}, resource_type: {resource_type}, floor: {floor}, value: {value}, needs_clarification: {needs_clarification}")
+
         return ParsedCommand(
             action=action,
             resource_type=resource_type,
@@ -337,8 +340,12 @@ Respond with ONLY the JSON object."""
         previous_values: Dict[str, float] = {}
         new_values: Dict[str, float] = {}
 
+        print(f"[AI_CONTROLLER] execute_command called")
+        print(f"[AI_CONTROLLER] Parsed command: action={parsed.action}, resource_type={parsed.resource_type}, floor={parsed.floor}, value={parsed.value}")
+
         # Handle clarification needed
         if parsed.needs_clarification:
+            print(f"[AI_CONTROLLER] Command needs clarification: {parsed.clarification_question}")
             return ControlResult(
                 success=False,
                 message=parsed.clarification_question or "Please provide more details.",
@@ -362,12 +369,15 @@ Respond with ONLY the JSON object."""
             )
 
         # Execute action on each resource
+        print(f"[AI_CONTROLLER] Executing action on {len(resources)} resources")
         for resource in resources:
+            print(f"[AI_CONTROLLER] Processing resource: {resource.resource_id} (controllable: {resource.is_controllable})")
             if not resource.is_controllable:
                 continue
 
             previous_values[resource.resource_id] = resource.current_value
             new_value = self._calculate_new_value(resource, parsed)
+            print(f"[AI_CONTROLLER] New value for {resource.resource_id}: {resource.current_value} -> {new_value}")
             
             # Update the resource
             success = data_store.update_resource_value(resource.resource_id, new_value)
@@ -375,13 +385,17 @@ Respond with ONLY the JSON object."""
             if success:
                 resources_affected.append(resource.resource_id)
                 new_values[resource.resource_id] = new_value
+                print(f"[AI_CONTROLLER] Resource {resource.resource_id} updated successfully")
 
         # Generate result message
+        print(f"[AI_CONTROLLER] Resources affected: {len(resources_affected)}")
         if resources_affected:
             message = self._generate_success_message(parsed, resources_affected, new_values)
             estimated_impact = self._estimate_impact(parsed, new_values)
+            print(f"[AI_CONTROLLER] Success message: {message}")
         else:
             message = "No resources were modified. Please check your command."
+            print(f"[AI_CONTROLLER] No resources modified")
 
         # Log command
         self.command_history.append({
@@ -409,6 +423,7 @@ Respond with ONLY the JSON object."""
 
     def _get_target_resources(self, parsed: ParsedCommand, building_data: Optional[Dict] = None) -> List[Resource]:
         """Get the list of resources to modify based on parsed command."""
+        print(f"[AI_CONTROLLER] _get_target_resources - resource_type: {parsed.resource_type}, floor: {parsed.floor}")
         all_resources = data_store.get_all_resources()
         
         # Filter by resource type

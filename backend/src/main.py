@@ -666,19 +666,26 @@ def chatbot_message(request: dict):
         "message": "user's message"
     }
     """
+    print(f"[CHATBOT API] Received chatbot message request")
+    print(f"[CHATBOT API] Request body: {request}")
+    
     try:
         user_id = request.get("user_id", "default_user")
         message = request.get("message", "")
 
-        print(f"Chatbot request: user_id={user_id}, message={message[:50]}...")
+        print(f"[CHATBOT API] user_id={user_id}, message={message[:100]}...")
 
         if not message:
+            print(f"[CHATBOT API] ERROR: Message is required")
             raise HTTPException(status_code=400, detail="Message is required")
 
         # Use the new chatbot implementation
+        print(f"[CHATBOT API] Processing message with new_chatbot...")
         response = new_chatbot.process_message(user_id, message)
 
-        print(f"Chatbot response: {response['response'][:50]}...")
+        print(f"[CHATBOT API] Response generated successfully")
+        print(f"[CHATBOT API] Response type: {response['type']}")
+        print(f"[CHATBOT API] Response preview: {response['response'][:100]}...")
 
         return {
             "success": True,
@@ -690,8 +697,8 @@ def chatbot_message(request: dict):
         raise
     except Exception as e:
         import traceback
-        print(f"Chatbot error: {str(e)}")
-        print(traceback.format_exc())
+        print(f"[CHATBOT API ERROR] Error processing chatbot message: {str(e)}")
+        print(f"[CHATBOT API ERROR] Traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"Error processing chatbot message: {str(e)}")
 
 
@@ -871,24 +878,30 @@ def batch_control_resources(request: dict):
 async def websocket_endpoint(websocket: WebSocket):
     """WebSocket for real-time building data updates."""
     await manager.connect(websocket)
+    print(f"[WS] New WebSocket connection established from: {websocket.client}")
+    
     try:
-        print(f"New WebSocket connection established from: {websocket.client}")
-
         # Send initial data
+        print(f"[WS] Sending initial building data...")
         initial_data = ai_brain.get_building_decision()
         formatted_data = _format_for_frontend(initial_data)
         await websocket.send_text(json.dumps(formatted_data))
+        print(f"[WS] Initial data sent successfully")
 
         while True:
             # Wait for client messages (can be used for commands)
+            print(f"[WS] Waiting for message from client...")
             data = await websocket.receive_text()
+            print(f"[WS] Received raw data: {data[:200]}...")
 
             try:
                 message = json.loads(data)
                 action = message.get("action")
+                print(f"[WS] Parsed message - action: {action}")
 
                 if action == "simulate_anomaly":
                     # Handle simulation request
+                    print(f"[WS] Handling simulate_anomaly action")
                     rt = message.get("resource_type", "hvac")
                     zone = message.get("zone_id", "office_a")
                     alert = ai_brain.simulate_anomaly(rt, zone)
@@ -897,33 +910,68 @@ async def websocket_endpoint(websocket: WebSocket):
                             "type": "simulation_result",
                             "alert": alert.to_dict()
                         }))
+                    print(f"[WS] Simulate anomaly completed")
 
                 elif action == "get_status":
                     # Send current status
+                    print(f"[WS] Handling get_status action")
                     status = ai_brain.get_building_decision()
                     formatted_status = _format_for_frontend(status)
                     await websocket.send_text(json.dumps(formatted_status))
+                    print(f"[WS] Status sent successfully")
 
                 elif action == "chat_message":
                     # Handle chatbot message
+                    print(f"[WS] Handling chat_message action")
                     user_id = message.get("user_id", "default_user")
                     chat_text = message.get("message", "")
+                    print(f"[WS] Chat message from {user_id}: {chat_text}")
 
                     if chat_text:
-                        chat_response = chatbot.process_message(user_id, chat_text)
-                        await websocket.send_text(json.dumps({
-                            "type": "chat_response",
-                            "response": chat_response
-                        }))
+                        try:
+                            print(f"[WS] Processing message with new_chatbot...")
+                            chat_response = new_chatbot.process_message(user_id, chat_text)
+                            print(f"[WS] Chat response generated: {chat_response['response'][:100]}...")
+                            
+                            response_data = {
+                                "type": "chat_response",
+                                "response": chat_response
+                            }
+                            await websocket.send_text(json.dumps(response_data))
+                            print(f"[WS] Chat response sent successfully")
+                        except Exception as chat_error:
+                            print(f"[WS ERROR] Error processing chat message: {chat_error}")
+                            import traceback
+                            print(f"[WS ERROR] Traceback: {traceback.format_exc()}")
+                            await websocket.send_text(json.dumps({
+                                "type": "chat_error",
+                                "error": str(chat_error)
+                            }))
+                    else:
+                        print(f"[WS] Empty chat text, skipping")
 
-            except json.JSONDecodeError:
-                pass  # Ignore invalid JSON
+                else:
+                    print(f"[WS] Unknown action: {action}")
+                    await websocket.send_text(json.dumps({
+                        "type": "error",
+                        "message": f"Unknown action: {action}"
+                    }))
+
+            except json.JSONDecodeError as json_err:
+                print(f"[WS ERROR] JSON decode error: {json_err}")
+                print(f"[WS ERROR] Raw data was: {data[:500]}")
+                await websocket.send_text(json.dumps({
+                    "type": "error",
+                    "message": "Invalid JSON format"
+                }))
 
     except WebSocketDisconnect:
-        print(f"WebSocket connection disconnected: {websocket.client}")
+        print(f"[WS] WebSocket connection disconnected: {websocket.client}")
         manager.disconnect(websocket)
     except Exception as e:
-        print(f"WebSocket error: {e}")
+        print(f"[WS ERROR] WebSocket error: {e}")
+        import traceback
+        print(f"[WS ERROR] Traceback: {traceback.format_exc()}")
         manager.disconnect(websocket)
 
 
@@ -981,25 +1029,41 @@ def _format_for_frontend(data: dict) -> dict:
 async def periodic_broadcast():
     """Periodically broadcast building data to all connected clients."""
     last_data = None
-    
+    broadcast_count = 0
+
     while True:
         try:
+            broadcast_count += 1
+            print(f"[BROADCAST #{broadcast_count}] Starting periodic broadcast...")
+            print(f"[BROADCAST #{broadcast_count}] Active connections: {len(manager.active_connections)}")
+            
             # Get building decision from AI (with caching)
             data = ai_brain.get_building_decision()
-            
+
             # Format for frontend
             formatted_data = _format_for_frontend(data)
             last_data = formatted_data
 
             # Broadcast to all connected clients
-            await manager.broadcast(json.dumps(formatted_data))
+            if manager.active_connections:
+                print(f"[BROADCAST #{broadcast_count}] Broadcasting to {len(manager.active_connections)} clients...")
+                await manager.broadcast(json.dumps(formatted_data))
+                print(f"[BROADCAST #{broadcast_count}] Broadcast completed successfully")
+            else:
+                print(f"[BROADCAST #{broadcast_count}] No active connections, skipping broadcast")
 
         except Exception as e:
-            print(f"Error in periodic broadcast: {e}")
-            
+            print(f"[BROADCAST ERROR] Error in periodic broadcast: {e}")
+            import traceback
+            print(f"[BROADCAST ERROR] Traceback: {traceback.format_exc()}")
+
             # Send last known good data if available
-            if last_data:
-                await manager.broadcast(json.dumps(last_data))
+            if last_data and manager.active_connections:
+                try:
+                    await manager.broadcast(json.dumps(last_data))
+                    print(f"[BROADCAST] Sent last known good data")
+                except Exception as retry_err:
+                    print(f"[BROADCAST ERROR] Failed to send last known data: {retry_err}")
 
         # Wait before next broadcast (10 seconds to avoid rate limits)
         await asyncio.sleep(10)

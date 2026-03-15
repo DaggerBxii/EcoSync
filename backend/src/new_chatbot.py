@@ -58,15 +58,15 @@ class EcoSyncChatbot:
         try:
             api_key = os.environ.get("GEMINI_API_KEY")
             if not api_key:
-                print("EcoSyncChatbot: GEMINI_API_KEY not found in environment.")
+                print("[NEW_CHATBOT] GEMINI_API_KEY not found in environment.")
                 return False
 
             self.client = genai.Client(api_key=api_key)
             self.using_fallback = False
-            print("EcoSyncChatbot: Gemini AI initialized successfully.")
+            print("[NEW_CHATBOT] Gemini AI initialized successfully.")
             return True
         except Exception as e:
-            print(f"EcoSyncChatbot: Error initializing Gemini: {e}")
+            print(f"[NEW_CHATBOT] Error initializing Gemini: {e}")
             return False
 
     def get_or_create_history(self, user_id: str) -> List[ChatMessage]:
@@ -86,29 +86,38 @@ class EcoSyncChatbot:
         Returns:
             Dictionary containing the chatbot response
         """
+        print(f"[NEW_CHATBOT] process_message called - user_id: {user_id}, message: {message[:100]}...")
+        
         # Add user message to history
         user_msg = ChatMessage(role="user", content=message)
         history = self.get_or_create_history(user_id)
         history.append(user_msg)
+        print(f"[NEW_CHATBOT] Added user message to history (length: {len(history)})")
 
         # Check if this is a control command
+        print(f"[NEW_CHATBOT] Checking if message is a control command...")
         control_result = self._process_control_command(message, user_id)
         
         if control_result:
             # This was a control command, return the result
+            print(f"[NEW_CHATBOT] Control command detected - success: {control_result.success}")
             response_content = self._format_control_response(control_result, message)
         else:
             # This is a regular query, use Gemini for response
+            print(f"[NEW_CHATBOT] Not a control command, using Gemini for response...")
             response_content = self._get_genai_response(message, user_id)
 
         # Add assistant response to history
         assistant_msg = ChatMessage(role="assistant", content=response_content)
         history.append(assistant_msg)
+        print(f"[NEW_CHATBOT] Added assistant message to history (length: {len(history)})")
 
         # Keep only the last 10 messages to prevent history from growing too large
         if len(history) > 10:
             self.chat_histories[user_id] = history[-10:]
+            print(f"[NEW_CHATBOT] Trimmed history to 10 messages")
 
+        print(f"[NEW_CHATBOT] Returning response (length: {len(response_content)} chars)")
         return {
             "response": response_content,
             "timestamp": datetime.utcnow().isoformat() + "Z",
@@ -126,12 +135,16 @@ class EcoSyncChatbot:
         Returns:
             ControlResult if it was a control command, None otherwise
         """
+        print(f"[NEW_CHATBOT] _process_control_command called - message: {message[:50]}...")
+        
         # Parse the command using AIController
+        print(f"[NEW_CHATBOT] Parsing command with ai_controller...")
         parsed = ai_controller.parse_command(message, {
             "building_name": data_store.building_name,
             "current_floor": None,  # Could be enhanced to track current floor per user
             "total_floors": len(data_store.get_floors())
         })
+        print(f"[NEW_CHATBOT] Parsed command - action: {parsed.action}, resource_type: {parsed.resource_type}, floor: {parsed.floor}")
 
         # Check if this is a control command (not just a query)
         control_keywords = [
@@ -141,16 +154,22 @@ class EcoSyncChatbot:
         ]
 
         is_control = any(keyword in message.lower() for keyword in control_keywords)
+        print(f"[NEW_CHATBOT] is_control: {is_control}, needs_clarification: {parsed.needs_clarification}")
         
         if is_control and not parsed.needs_clarification:
             # Execute the command
+            print(f"[NEW_CHATBOT] Executing control command...")
             result = ai_controller.execute_command(parsed)
+            print(f"[NEW_CHATBOT] Command executed - success: {result.success}, resources affected: {len(result.resources_affected)}")
             return result
 
+        print(f"[NEW_CHATBOT] Not a control command or needs clarification, returning None")
         return None
 
     def _format_control_response(self, result: ControlResult, original_command: str) -> str:
         """Format the response for a control command."""
+        print(f"[NEW_CHATBOT] _format_control_response called - success: {result.success}")
+        
         if result.success:
             response_parts = [result.message]
             
@@ -173,13 +192,18 @@ class EcoSyncChatbot:
 
     def _get_genai_response(self, message: str, user_id: str) -> str:
         """Get response from Gemini AI."""
+        print(f"[NEW_CHATBOT] _get_genai_response called - message: {message[:50]}...")
+        
         if not self.client or self.using_fallback:
+            print(f"[NEW_CHATBOT] Using fallback mode (client: {self.client is not None}, using_fallback: {self.using_fallback})")
             return self._fallback_response(message)
 
         try:
+            print(f"[NEW_CHATBOT] Getting building data for context...")
             # Get current building state
             building_data = ai_brain.get_building_decision()
             building_metrics = data_store.get_building_metrics()
+            print(f"[NEW_CHATBOT] Building data retrieved - efficiency: {building_metrics.overall_efficiency}%")
             
             # Prepare context for the AI
             context = {
@@ -193,7 +217,7 @@ class EcoSyncChatbot:
             # Prepare the prompt with building context
             prompt = f"""
             You are EcoSync Assistant, an AI building resource management expert for {context['building_name']}.
-            
+
             Current Building State:
             - Overall Efficiency: {context['building_metrics']['overall_efficiency']}%
             - Energy Consumption: {context['building_metrics']['energy_consumption']} kW
@@ -201,23 +225,24 @@ class EcoSyncChatbot:
             - Active Alerts: {context['building_metrics']['active_alerts']}
             - Critical Alerts: {context['building_metrics']['critical_alerts']}
             - Active Zones: {context['building_metrics']['active_zones']}/{context['building_metrics']['total_zones']}
-            
+
             Building Insight: {context['building_insight']}
-            
+
             User asked: "{message}"
-            
+
             Provide a helpful, accurate response related to building resource management.
             If the question is about energy, water, HVAC, or lighting, relate it to the current building state.
             Keep the response concise but informative.
             If the user wants to control resources, suggest specific commands they can use.
-            
+
             Example commands:
-            - "Limit water on floor 2 to 60%"
+            - "Limit water on floor 1 to 60%"
             - "Turn off lights on floor 5"
             - "Set HVAC to 22°C"
             - "Optimize electricity"
             """
 
+            print(f"[NEW_CHATBOT] Calling Gemini API...")
             response = self.client.models.generate_content(
                 model=self.model_name,
                 contents=prompt,
@@ -226,14 +251,19 @@ class EcoSyncChatbot:
                 )
             )
             
+            print(f"[NEW_CHATBOT] Gemini response received (length: {len(response.text)} chars)")
             return response.text
             
         except Exception as e:
-            print(f"Error calling Gemini: {e}")
+            print(f"[NEW_CHATBOT ERROR] Error calling Gemini: {e}")
+            import traceback
+            print(f"[NEW_CHATBOT ERROR] Traceback: {traceback.format_exc()}")
             return self._fallback_response(message)
 
     def _fallback_response(self, message: str) -> str:
         """Fallback response when Gemini is not available."""
+        print(f"[NEW_CHATBOT] _fallback_response called")
+        
         # Get basic building metrics
         metrics = data_store.get_building_metrics()
         
@@ -257,10 +287,11 @@ class EcoSyncChatbot:
             avg_lighting = sum(r.current_value for r in lighting_resources) / len(lighting_resources) if lighting_resources else 0
             return f"Average lighting level is {avg_lighting:.1f}%. The building has {metrics.resources_by_type.get('lighting', 0)} lighting resources."
         else:
-            return f"I'm EcoSync Assistant. I can help you manage building resources. Current efficiency: {metrics.overall_efficiency}%. Try asking about energy, water, HVAC, or lighting, or use commands like 'limit water on floor 2 to 60%'."
+            return f"I'm EcoSync Assistant. I can help you manage building resources. Current efficiency: {metrics.overall_efficiency}%. Try asking about energy, water, HVAC, or lighting, or use commands like 'limit water on floor 1 to 60%'."
 
     def get_building_status(self, user_id: str) -> Dict[str, Any]:
         """Get current building status for the chat interface."""
+        print(f"[NEW_CHATBOT] get_building_status called for user: {user_id}")
         building_overview = data_store.get_building_overview()
         
         return {
@@ -277,6 +308,7 @@ class EcoSyncChatbot:
 
     def get_user_history(self, user_id: str) -> List[Dict[str, Any]]:
         """Get chat history for a user."""
+        print(f"[NEW_CHATBOT] get_user_history called for user: {user_id}")
         history = self.get_or_create_history(user_id)
         return [{"role": msg.role, "content": msg.content, "timestamp": msg.timestamp} 
                 for msg in history]
