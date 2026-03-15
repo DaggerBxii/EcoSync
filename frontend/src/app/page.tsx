@@ -352,122 +352,178 @@ const getHeatmapColor = (intensity: number) => {
 
 // Energy Resource Card Component
 function EnergyCard({ name, description, icon, color, availability, status }: { name: string; description: string; icon: React.ReactNode; color: string; availability: number; status: "optimal" | "moderate" | "low" }) {
-  return (
-    <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg border border-gray-100 dark:border-gray-700 hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
-      <div className={`inline-flex p-3 rounded-xl ${color} text-white mb-4`}>{icon}</div>
-      <h3 className="text-xl font-semibold text-black dark:text-white mb-2">{name}</h3>
-      <p className="text-gray-600 dark:text-gray-300 mb-4">{description}</p>
-      <div className="flex items-center justify-between">
-        <span className="text-sm text-gray-500 dark:text-gray-400">Availability</span>
-        <span className={`text-sm font-semibold ${status === "optimal" ? "text-ecosync-green" : status === "moderate" ? "text-yellow-500" : "text-red-500"}`}>{availability}%</span>
-      </div>
-      <div className="mt-2 h-2 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
-        <div className={`h-full rounded-full transition-all duration-500 ${status === "optimal" ? "bg-ecosync-green" : status === "moderate" ? "bg-yellow-500" : "bg-red-500"}`} style={{ width: `${availability}%` }} />
-      </div>
-    </div>
-  );
-}
+import { useState, useEffect } from 'react';
+import Link from 'next/link';
+import OpenStreetMap from '@/components/OpenStreetMap';
 
-// Feature Card Component
-function FeatureCard({ icon, title, description, color }: { icon: React.ReactNode; title: string; description: string; color: string }) {
-  return (
-    <div className="bg-white dark:bg-gray-800 rounded-2xl p-8 shadow-lg border border-gray-100 dark:border-gray-700 hover:shadow-xl transition-all duration-300">
-      <div className={`inline-flex p-3 rounded-xl ${color} mb-4`}>{icon}</div>
-      <h3 className="text-xl font-semibold text-black dark:text-white mb-3">{title}</h3>
-      <p className="text-gray-600 dark:text-gray-300 leading-relaxed">{description}</p>
-    </div>
-  );
-}
+// Jamaica parishes with energy data
+const jamaicaParishes = [
+  { name: 'Kingston', energy: 92, areas: ['New Kingston', 'Half Way Tree', 'Downtown', 'Kingston 5'] },
+  { name: 'St. Andrew', energy: 85, areas: ['Portmore', 'Spanish Town', 'Mandela', 'Linstead'] },
+  { name: 'St. Catherine', energy: 78, areas: ['Spanish Town', 'Portmore', 'Old Harbour', 'Bog Walk'] },
+  { name: 'Clarendon', energy: 65, areas: ['May Pen', 'Frankfield', 'Chapelton', 'Milk River'] },
+  { name: 'Manchester', energy: 58, areas: ['Mandeville', 'Christiana', 'Williamsfield', 'Porus'] },
+  { name: 'St. Elizabeth', energy: 52, areas: ['Black River', 'Santa Cruz', 'Lacovia', 'Junction'] },
+  { name: 'Westmoreland', energy: 62, areas: ['Negril', 'Savanna-la-Mar', 'Grange Hill', 'Bluefields'] },
+  { name: 'Hanover', energy: 48, areas: ['Lucea', 'Hopewell', 'Bethel', 'Green Island'] },
+  { name: 'St. James', energy: 75, areas: ['Montego Bay', 'Irons Shore', 'Cambridge', 'Reading'] },
+  { name: 'Trelawny', energy: 50, areas: ['Falmouth', 'Martha Brae', 'Clark\'s Town', 'Duncans'] },
+  { name: 'St. Ann', energy: 58, areas: ['Ocho Rios', 'St. Ann\'s Bay', 'Runaway Bay', 'Discovery Bay'] },
+  { name: 'St. Mary', energy: 45, areas: ['Port Maria', 'Oracabessa', 'Island Head', 'Boscobel'] },
+  { name: 'Portland', energy: 40, areas: ['Port Antonio', 'Buff Bay', 'Long Bay', 'Boston'] },
+  { name: 'St. Thomas', energy: 42, areas: ['Morant Bay', 'Bath', 'Yallahs', 'Seaforth'] },
+];
 
-// Navigation Component
-function Navigation({ onNavigate, isDarkMode, onToggleDarkMode }: { onNavigate: (page: "home" | "auth") => void; isDarkMode: boolean; onToggleDarkMode: () => void }) {
-  const [isScrolled, setIsScrolled] = useState(false);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+export default function HomePage() {
+  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [selectedParish, setSelectedParish] = useState<string | null>(null);
+  const [selectedArea, setSelectedArea] = useState<string | null>(null);
+  const [isLoaded, setIsLoaded] = useState(false);
+  const [visibleSections, setVisibleSections] = useState<Set<string>>(new Set());
+  const [showMapButton, setShowMapButton] = useState(false);
 
+  // Initialize theme from localStorage on mount
   useEffect(() => {
-    const handleScroll = () => setIsScrolled(window.scrollY > 20);
-    window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
+    setIsLoaded(true);
+    const savedTheme = localStorage.getItem('theme');
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    
+    if (savedTheme === 'dark' || (!savedTheme && prefersDark)) {
+      setIsDarkMode(true);
+      document.documentElement.setAttribute('data-theme', 'dark');
+    }
   }, []);
 
-  const scrollToSection = useCallback((sectionId: string) => {
-    const element = document.getElementById(sectionId);
-    if (element) element.scrollIntoView({ behavior: "smooth" });
-    setIsMobileMenuOpen(false);
+  // Scroll handler for floating map button
+  useEffect(() => {
+    const handleScroll = () => {
+      const dashboardSection = document.getElementById('dashboard');
+      if (dashboardSection) {
+        const sectionTop = dashboardSection.offsetTop - 800;
+        setShowMapButton(window.scrollY < sectionTop);
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  const navLinks = [
-    { name: "Features", href: "features" },
-    { name: "Dashboard", href: "dashboard" },
-    { name: "Resources", href: "resources" },
-    { name: "About", href: "about" },
-  ];
+  // Intersection Observer for scroll animations
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            setVisibleSections((prev) => new Set(prev).add(entry.target.id));
+          }
+        });
+      },
+      { threshold: 0.1 }
+    );
+
+    document.querySelectorAll('section[id]').forEach((section) => {
+      observer.observe(section);
+    });
+
+    return () => observer.disconnect();
+  }, []);
+
+  // Toggle theme
+  const toggleTheme = () => {
+    const newMode = !isDarkMode;
+    setIsDarkMode(newMode);
+    if (newMode) {
+      document.documentElement.setAttribute('data-theme', 'dark');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      document.documentElement.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  const getHeatColor = (energy: number) => {
+    if (energy >= 80) return '#ef4444';
+    if (energy >= 60) return '#f97316';
+    if (energy >= 40) return '#facc15';
+    return '#22c55e';
+  };
+
+  const getHeatGradient = (energy: number) => {
+    if (energy >= 80) return 'linear-gradient(135deg, rgba(239, 68, 68, 0.9), rgba(239, 68, 68, 0.6))';
+    if (energy >= 60) return 'linear-gradient(135deg, rgba(249, 115, 22, 0.9), rgba(249, 115, 22, 0.6))';
+    if (energy >= 40) return 'linear-gradient(135deg, rgba(250, 204, 21, 0.9), rgba(250, 204, 21, 0.6))';
+    return 'linear-gradient(135deg, rgba(34, 197, 94, 0.9), rgba(34, 197, 94, 0.6))';
+  };
+
+  const selectedParishData = jamaicaParishes.find(p => p.name === selectedParish);
+
+  if (!isLoaded) return null;
 
   return (
-    <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${isScrolled ? "bg-white/95 dark:bg-gray-900/95 backdrop-blur-md shadow-md" : "bg-transparent"}`}>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-20">
-          <div className="flex items-center gap-3">
-            <EcoSyncLogo />
-            <span className="text-2xl font-bold text-black dark:text-white">EcoSync</span>
-          </div>
-          <div className="hidden md:flex items-center gap-8">
-            {navLinks.map((link) => (
-              <button key={link.name} onClick={() => scrollToSection(link.href)} className="text-gray-700 dark:text-gray-300 hover:text-ecosync-green font-medium transition-colors">{link.name}</button>
-            ))}
-          </div>
-          <div className="hidden md:flex items-center gap-4">
-            <button onClick={onToggleDarkMode} className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-gray-700 dark:text-gray-300" aria-label="Toggle dark mode">
-              {isDarkMode ? <SunIcon /> : <MoonIcon />}
-            </button>
-            <button onClick={() => onNavigate("auth")} className="px-6 py-3 text-ecosync-green font-semibold hover:bg-ecosync-green-pale rounded-full transition-all duration-300">Sign In</button>
-            <button onClick={() => onNavigate("auth")} className="px-6 py-3 bg-ecosync-green text-white font-semibold rounded-full hover:bg-ecosync-green-dark transition-all duration-300 shadow-lg hover:shadow-xl btn-primary">Get Started</button>
-          </div>
-          <button className="md:hidden p-2 text-gray-700 dark:text-gray-300" onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
-            {isMobileMenuOpen ? <CloseIcon /> : <MenuIcon />}
-          </button>
-        </div>
+    <div className="min-h-screen relative overflow-x-hidden">
+      {/* Background Video */}
+      <div className="bg-video">
+        <video autoPlay loop muted playsInline>
+          <source src="https://videos.pexels.com/video-files/2882118/2882118-uhd_2560_1440_25fps.mp4" type="video/mp4" />
+          <source src="https://videos.pexels.com/video-files/1526904/1526904-uhd_2560_1440_24fps.mp4" type="video/mp4" />
+        </video>
       </div>
-      {isMobileMenuOpen && (
-        <div className="md:hidden bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-800">
-          <div className="px-4 py-4 space-y-4">
-            {navLinks.map((link) => (
-              <button key={link.name} onClick={() => scrollToSection(link.href)} className="block text-gray-700 dark:text-gray-300 hover:text-ecosync-green font-medium py-2 transition-colors w-full text-left">{link.name}</button>
-            ))}
-            <button onClick={() => onToggleDarkMode()} className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
-              {isDarkMode ? <SunIcon /> : <MoonIcon />}
-              <span>{isDarkMode ? "Light Mode" : "Dark Mode"}</span>
-            </button>
-            <button onClick={() => onNavigate("auth")} className="w-full px-6 py-3 bg-ecosync-green text-white font-semibold rounded-full hover:bg-ecosync-green-dark transition-all duration-300">Get Started</button>
-          </div>
-        </div>
-      )}
-    </nav>
-  );
-}
+      
+      {/* Main Content */}
+      <div className="relative z-10 min-h-screen bg-white dark:bg-black transition-colors duration-300">
+        
+        {/* Navigation */}
+        <nav className="fixed top-0 left-0 right-0 z-50 bg-white/95 dark:bg-black/95 backdrop-blur-md border-b border-gray-200 dark:border-gray-800 shadow-lg">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex items-center justify-between h-16">
+              <div className="flex items-center gap-3 fade-in-down">
+                <div className="w-10 h-10 rounded-xl animated-gradient flex items-center justify-center shadow-lg hover:scale-110 transition-transform">
+                  <svg className="w-6 h-6 text-white" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 2C8.5 2 5 4.5 5 8c0 2.5 1.5 4.5 3.5 5.5C8 15 7 17 7 19c0 2.5 2.5 3 5 3s5-.5 5-3c0-2-1-4-1.5-5.5C17.5 12.5 19 10.5 19 8c0-3.5-3.5-6-7-6zm0 2c2.5 0 5 1.5 5 4 0 1.5-.5 2.5-1.5 3.5-.5-1.5-1.5-3-3.5-3s-3 1.5-3.5 3C7.5 10.5 7 9.5 7 8c0-2.5 2.5-4 5-4z"/>
+                    <ellipse cx="12" cy="18" rx="4" ry="2" opacity="0.6"/>
+                  </svg>
+                </div>
+                <span className="text-xl font-bold text-gray-900 dark:text-white">EcoSync</span>
+              </div>
+              
+              <div className="hidden md:flex items-center gap-1 fade-in-down stagger-1">
+                {['Features', 'Dashboard', 'Resources', 'About'].map((item) => (
+                  <button
+                    key={item}
+                    onClick={() => document.getElementById(item.toLowerCase())?.scrollIntoView({ behavior: 'smooth' })}
+                    className="px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-green-600 dark:hover:text-green-400 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-900 transition-all hover-lift"
+                  >
+                    {item}
+                  </button>
+                ))}
+              </div>
 
-// Hero Section
-function HeroSection({ onNavigate }: { onNavigate: (page: "home" | "auth") => void }) {
-  const scrollToSection = useCallback((sectionId: string) => {
-    const element = document.getElementById(sectionId);
-    if (element) element.scrollIntoView({ behavior: "smooth" });
-  }, []);
-
-  return (
-    <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
-      <div className="absolute inset-0 z-0">
-        <div className="absolute inset-0 bg-cover bg-center bg-no-repeat" style={{ backgroundImage: `url('https://images.unsplash.com/photo-1509391366360-2e959784a276?q=80&w=2072&auto=format&fit=crop')` }} />
-        <div className="absolute inset-0 bg-gradient-to-br from-ecosync-green-pale/90 via-white/85 to-ecosync-blue-pale/90 dark:from-gray-900/90 dark:via-gray-900/80 dark:to-gray-800/90" />
-      </div>
-      <div className="absolute inset-0 overflow-hidden z-10">
-        <div className="absolute top-20 right-20 w-64 h-64 bg-ecosync-green-light/30 rounded-full blur-3xl float-animation" />
-        <div className="absolute bottom-20 left-20 w-64 h-64 bg-ecosync-blue-light/30 rounded-full blur-3xl float-animation-delayed" />
-      </div>
-      <div className="relative z-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20">
-        <div className="text-center">
-          <div className="inline-flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 rounded-full shadow-md mb-8 fade-in">
-            <span className="w-2 h-2 bg-ecosync-green rounded-full live-indicator" />
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Real-time Renewable Energy Synchronization</span>
+              <div className="flex items-center gap-3 fade-in-down stagger-2">
+                {/* Theme Toggle */}
+                <button
+                  onClick={toggleTheme}
+                  className="p-2.5 rounded-xl bg-gray-100 dark:bg-gray-900 text-gray-600 dark:text-yellow-400 hover:bg-gray-200 dark:hover:bg-gray-800 transition-all hover:scale-110"
+                  aria-label="Toggle theme"
+                >
+                  {isDarkMode ? (
+                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clipRule="evenodd" />
+                    </svg>
+                  ) : (
+                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z" />
+                    </svg>
+                  )}
+                </button>
+                
+                <Link
+                  href="/auth"
+                  className="px-6 py-2.5 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-full transition-all shadow-lg hover:shadow-xl hover:scale-105"
+                >
+                  Get Started
+                </Link>
+              </div>
+            </div>
           </div>
           <h1 className="text-5xl md:text-7xl font-bold text-black dark:text-white mb-6 fade-in-delay-1">
             Synchronize with<br />
@@ -706,694 +762,459 @@ function JamaicaHeatmap({
           <HomeIcon />
         </button>
       </div>
+        </nav>
 
-      {/* Zoom Level Indicator */}
-      <div className="absolute top-4 left-4 z-10 bg-white/90 dark:bg-gray-800/90 backdrop-blur rounded-lg px-4 py-2 shadow-lg">
-        <div className="flex items-center gap-2">
-          <MapIcon />
-          <span className="font-semibold text-gray-700 dark:text-gray-300">
-            {zoomLevel === 1 && "Jamaica Energy Heatmap"}
-            {zoomLevel === 2 && `${selectedParishData?.name} - Parishes`}
-            {zoomLevel === 3 && `${selectedNeighborhood || "Neighborhoods"}`}
-          </span>
-        </div>
-      </div>
-
-      {/* User Location Badge */}
-      {userLocation && (
-        <div className="absolute top-20 left-4 z-10 bg-ecosync-green/90 backdrop-blur rounded-lg px-4 py-2 shadow-lg">
-          <div className="flex items-center gap-2 text-white">
-            <LocationIcon />
-            <span className="font-semibold text-sm">Your Area: {userLocation.neighborhood}, {userLocation.parish}</span>
-          </div>
-        </div>
-      )}
-
-      {/* Heatmap Legend */}
-      <div className="absolute bottom-4 left-4 z-10 bg-white/90 dark:bg-gray-800/90 backdrop-blur rounded-lg px-4 py-3 shadow-lg">
-        <div className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">Energy Usage Heatmap</div>
-        <div className="flex items-center gap-1">
-          <div className="w-10 h-4 rounded" style={{ backgroundColor: "#ef4444" }} />
-          <div className="w-10 h-4 rounded" style={{ backgroundColor: "#f97316" }} />
-          <div className="w-10 h-4 rounded" style={{ backgroundColor: "#eab308" }} />
-          <div className="w-10 h-4 rounded" style={{ backgroundColor: "#84cc16" }} />
-          <div className="w-10 h-4 rounded" style={{ backgroundColor: "#22c55e" }} />
-        </div>
-        <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
-          <span>Very High (80%+)</span>
-          <span>Low (&lt;40%)</span>
-        </div>
-      </div>
-
-      {/* Jamaica Map Container */}
-      <div className="aspect-video bg-gradient-to-br from-blue-200 via-blue-300 to-blue-400 dark:from-gray-700 dark:via-gray-600 dark:to-gray-500 rounded-2xl overflow-hidden relative shadow-2xl">
-        {zoomLevel === 1 ? (
-          // Full Jamaica Heatmap View
-          <svg viewBox="0 0 800 300" className="w-full h-full" preserveAspectRatio="xMidYMid meet">
-            <defs>
-              {/* Ocean gradient */}
-              <linearGradient id="oceanGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor="#93c5fd" />
-                <stop offset="50%" stopColor="#60a5fa" />
-                <stop offset="100%" stopColor="#3b82f6" />
-              </linearGradient>
+        {/* Hero Section */}
+        <section className="pt-32 pb-20 px-4">
+          <div className="max-w-7xl mx-auto">
+            <div className="text-center mb-12 fade-in-up">
+              <h1 className="text-4xl md:text-6xl font-extrabold text-gray-900 dark:text-white mb-4 leading-tight">
+                Conserve Energy.<br />
+                <span className="text-green-600">Protect Our Future.</span>
+              </h1>
+              <p className="text-lg md:text-xl text-gray-600 dark:text-gray-400 max-w-3xl mx-auto mb-8">
+                Join the movement to reduce energy waste and build a sustainable tomorrow. 
+                Track, analyze, and optimize your energy consumption with AI-powered insights.
+              </p>
               
-              {/* Glow filter for parishes */}
-              <filter id="parishGlow">
-                <feGaussianBlur stdDeviation="2" result="coloredBlur" />
-                <feMerge>
-                  <feMergeNode in="coloredBlur" />
-                  <feMergeNode in="SourceGraphic" />
-                </feMerge>
-              </filter>
+              {/* Choose Your Perspective Button */}
+              <div className="mb-8 fade-in-up stagger-1">
+                <Link
+                  href="/perspectives"
+                  className="inline-block px-8 py-4 bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700 text-white font-bold rounded-full transition-all shadow-xl hover:shadow-2xl hover:scale-105"
+                >
+                  Choose Your Perspective →
+                </Link>
+              </div>
+              
+              <div className="flex flex-wrap justify-center gap-4 fade-in-up stagger-2">
+                <Link href="/auth/register" className="px-8 py-4 bg-green-600 hover:bg-green-700 text-white font-bold rounded-full transition-all shadow-lg hover:shadow-xl hover:scale-105">
+                  Start Saving Today →
+                </Link>
+                <button
+                  onClick={() => document.getElementById('dashboard')?.scrollIntoView({ behavior: 'smooth' })}
+                  className="px-8 py-4 bg-gray-100 dark:bg-gray-900 hover:bg-gray-200 dark:hover:bg-gray-800 text-gray-900 dark:text-white font-bold rounded-full transition-all hover:scale-105"
+                >
+                  View Jamaica Energy Map
+                </button>
+                <a
+                  href="#dashboard"
+                  className="px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold rounded-full transition-all shadow-lg hover:shadow-xl hover:scale-105 flex items-center gap-2"
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                  </svg>
+                  Explore Interactive Map
+                </a>
+              </div>
+            </div>
 
-              {/* Heatmap gradient overlay */}
-              <radialGradient id="heatGradient">
-                <stop offset="0%" stopColor="white" stopOpacity="0" />
-                <stop offset="100%" stopColor="white" stopOpacity="0.3" />
-              </radialGradient>
-            </defs>
-
-            {/* Ocean background */}
-            <rect width="800" height="300" fill="url(#oceanGradient)" />
-
-            {/* Grid lines for map effect */}
-            <g stroke="rgba(255,255,255,0.1)" strokeWidth="1">
-              {[...Array(10)].map((_, i) => (
-                <line key={`h${i}`} x1="0" y1={i * 30} x2="800" y2={i * 30} />
+            {/* Stats */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-8 max-w-4xl mx-auto mb-16">
+              {[
+                { value: '40%', label: 'Average Energy Savings', icon: '📉' },
+                { value: '1M+', label: 'Tons CO₂ Prevented', icon: '🌍' },
+                { value: '50K+', label: 'Active Users', icon: '👥' },
+                { value: '24/7', label: 'Real-Time Monitoring', icon: '⚡' },
+              ].map((stat, i) => (
+                <div key={i} className="text-center p-6 bg-gray-50 dark:bg-gray-900 rounded-2xl hover-lift">
+                  <div className="text-4xl mb-2 float">{stat.icon}</div>
+                  <div className="text-3xl font-bold text-green-600 mb-1 scale-in" style={{ animationDelay: `${i * 0.1}s` }}>{stat.value}</div>
+                  <div className="text-sm text-gray-600 dark:text-gray-400">{stat.label}</div>
+                </div>
               ))}
-              {[...Array(16)].map((_, i) => (
-                <line key={`v${i}`} x1={i * 50} y1="0" x2={i * 50} y2="300" />
-              ))}
-            </g>
+            </div>
+          </div>
 
-            {/* Jamaica base shape with outline */}
-            <path 
-              d={jamaicaOutline} 
-              fill="#86efac" 
-              stroke="#059669" 
-              strokeWidth="3"
-              filter="url(#parishGlow)"
-            />
+          {/* Choose Your Perspective Section */}
+          <section id="perspectives" className="py-16 px-4">
+            <div className="max-w-7xl mx-auto">
+              <div className="text-center mb-12 fade-in-up">
+                <h2 className="text-3xl md:text-5xl font-extrabold text-gray-900 dark:text-white mb-4">
+                  Select Your <span className="text-green-600">Perspective</span>
+                </h2>
+                <p className="text-xl text-gray-600 dark:text-gray-400">
+                  Choose the dashboard that matches your energy management needs
+                </p>
+              </div>
+              <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+                {/* Consumer Card */}
+                <Link href="/consumer" className="group bg-gradient-to-br from-green-50 to-white dark:from-gray-900 dark:to-gray-800 rounded-3xl p-8 shadow-lg border-2 border-green-200 dark:border-green-800 hover:shadow-2xl hover:scale-105 transition-all card-hover fade-in-up stagger-1">
+                  <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-green-500 to-green-400 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform rotate-slow">
+                    <svg className="w-8 h-8 text-white" viewBox="0 0 24 24" fill="none">
+                      <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      <path d="M9 22V12h6v10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  </div>
+                  <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">Consumer</h3>
+                  <p className="text-green-600 font-medium mb-4">Home & Residential</p>
+                  <p className="text-gray-600 dark:text-gray-400 mb-6">
+                    Optimize your home energy usage with AI-powered insights for HVAC, appliances, and solar panels.
+                  </p>
+                  <ul className="space-y-2 mb-6">
+                    {['Real-time monitoring', 'Solar optimization', 'Smart scheduling', 'Carbon tracking'].map((item, i) => (
+                      <li key={i} className="flex items-center gap-2 text-gray-700 dark:text-gray-300 fade-in-left">
+                        <span className="w-2 h-2 rounded-full bg-green-600" />
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="w-full py-3 bg-gradient-to-r from-green-600 to-green-500 text-white font-semibold rounded-full text-center group-hover:shadow-lg transition-all">
+                    Enter Consumer Dashboard →
+                  </div>
+                </Link>
 
-            {/* Parish heat overlays - colored paths showing energy intensity */}
-            <g filter="url(#parishGlow)">
-              {jamaicaParishes.map((parish) => {
-                const isSelected = selectedParish === parish.id;
-                const isHovered = hoveredParish === parish.id;
-                const isUserLocation = userLocation?.parish === parish.name;
+                {/* Enterprise Card */}
+                <Link href="/enterprise" className="group bg-gradient-to-br from-blue-50 to-white dark:from-gray-900 dark:to-gray-800 rounded-3xl p-8 shadow-lg border-2 border-blue-200 dark:border-blue-800 hover:shadow-2xl hover:scale-105 transition-all card-hover fade-in-up stagger-2">
+                  <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-blue-400 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform rotate-slow">
+                    <svg className="w-8 h-8 text-white" viewBox="0 0 24 24" fill="none">
+                      <path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  </div>
+                  <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">Enterprise</h3>
+                  <p className="text-blue-600 font-medium mb-4">Commercial Buildings</p>
+                  <p className="text-gray-600 dark:text-gray-400 mb-6">
+                    Manage energy across multiple zones with compliance tracking and automated HVAC control.
+                  </p>
+                  <ul className="space-y-2 mb-6">
+                    {['Zone management', 'HVAC optimization', 'Compliance tracking', 'Multi-building'].map((item, i) => (
+                      <li key={i} className="flex items-center gap-2 text-gray-700 dark:text-gray-300 fade-in-left">
+                        <span className="w-2 h-2 rounded-full bg-blue-600" />
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="w-full py-3 bg-gradient-to-r from-blue-600 to-blue-500 text-white font-semibold rounded-full text-center group-hover:shadow-lg transition-all">
+                    Enter Enterprise Dashboard →
+                  </div>
+                </Link>
 
-                return (
-                  <g
-                    key={parish.id}
-                    onClick={() => handleParishClick(parish.id)}
-                    onMouseEnter={() => setHoveredParish(parish.id)}
-                    onMouseLeave={() => setHoveredParish(null)}
-                    style={{ cursor: "pointer", transition: "all 0.3s ease" }}
-                  >
-                    {/* Parish area with heatmap color */}
-                    <path
-                      d={parish.path}
-                      fill={parish.color}
-                      opacity={isSelected || isHovered ? 0.95 : 0.75}
-                      stroke={isSelected ? "#ffffff" : "rgba(255,255,255,0.3)"}
-                      strokeWidth={isSelected ? 3 : 1}
-                      className="transition-all duration-300"
-                    />
-                    
-                    {/* User location pulse effect */}
-                    {isUserLocation && (
-                      <path
-                        d={parish.path}
-                        fill="none"
-                        stroke="#10b981"
-                        strokeWidth="3"
-                        className="animate-pulse"
-                        opacity="0.8"
-                      />
-                    )}
+                {/* Data Center Card */}
+                <Link href="/datacenter" className="group bg-gradient-to-br from-purple-50 to-white dark:from-gray-900 dark:to-gray-800 rounded-3xl p-8 shadow-lg border-2 border-purple-200 dark:border-purple-800 hover:shadow-2xl hover:scale-105 transition-all card-hover fade-in-up stagger-3">
+                  <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-500 to-purple-400 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform rotate-slow">
+                    <svg className="w-8 h-8 text-white" viewBox="0 0 24 24" fill="none">
+                      <rect x="2" y="2" width="20" height="8" rx="2" stroke="currentColor" strokeWidth="2"/>
+                      <rect x="2" y="14" width="20" height="8" rx="2" stroke="currentColor" strokeWidth="2"/>
+                      <path d="M6 6h.01M10 6h.01M6 18h.01M10 18h.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                    </svg>
+                  </div>
+                  <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">Data Center</h3>
+                  <p className="text-purple-600 font-medium mb-4">Compute Facilities</p>
+                  <p className="text-gray-600 dark:text-gray-400 mb-6">
+                    Optimize PUE, schedule jobs based on renewable availability, and reduce carbon footprint.
+                  </p>
+                  <ul className="space-y-2 mb-6">
+                    {['PUE monitoring', 'Renewable scheduling', 'GPU tracking', 'Carbon-aware compute'].map((item, i) => (
+                      <li key={i} className="flex items-center gap-2 text-gray-700 dark:text-gray-300 fade-in-left">
+                        <span className="w-2 h-2 rounded-full bg-purple-600" />
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="w-full py-3 bg-gradient-to-r from-purple-600 to-purple-500 text-white font-semibold rounded-full text-center group-hover:shadow-lg transition-all">
+                    Enter Data Center Dashboard →
+                  </div>
+                </Link>
+              </div>
+            </div>
+          </section>
+        </section>
 
-                    {/* Parish name label */}
-                    <text
-                      x={parish.cx}
-                      y={parish.cy - 8}
-                      textAnchor="middle"
-                      fill="white"
-                      fontSize="10"
-                      fontWeight="bold"
-                      className="pointer-events-none select-none"
-                      style={{ textShadow: "1px 1px 2px rgba(0,0,0,0.5)" }}
+        {/* Jamaica Energy Heatmap Section */}
+        <section id="dashboard" className="py-20 px-4 bg-green-50 dark:bg-gray-900">
+          <div className="max-w-7xl mx-auto">
+            <div className="text-center mb-12 fade-in-up">
+              <h2 className="text-3xl md:text-5xl font-extrabold text-gray-900 dark:text-white mb-4">
+                🇯🇲 Jamaica <span className="text-green-600">Energy Map</span>
+              </h2>
+              <p className="text-xl text-gray-600 dark:text-gray-400">
+                Real-time energy consumption across all 14 parishes
+              </p>
+            </div>
+
+            {/* Jamaica OpenStreetMap with Heatmap */}
+            <div className="fade-in-up">
+              <div className="mb-4 text-center">
+                <div className="inline-flex items-center gap-2 px-6 py-3 bg-green-100 dark:bg-green-900/30 rounded-full mb-4">
+                  <span className="text-2xl">👆</span>
+                  <span className="font-semibold text-green-800 dark:text-green-200">Click any parish to zoom in & view street-level energy data</span>
+                </div>
+              </div>
+              <OpenStreetMap 
+                selectedParish={selectedParish}
+                onParishSelect={setSelectedParish}
+              />
+            </div>
+
+            {/* Parish Selector */}
+            <div className="mb-8 fade-in-down">
+              <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 border border-gray-200 dark:border-gray-700 shadow-lg">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-8 h-8 rounded-full bg-green-600 flex items-center justify-center pulse-glow">
+                    <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                    </svg>
+                  </div>
+                  <span className="font-semibold text-gray-900 dark:text-white">Select a Parish:</span>
+                </div>
+                <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
+                  {jamaicaParishes.map((parish, i) => (
+                    <button
+                      key={parish.name}
+                      onClick={() => { setSelectedParish(parish.name); setSelectedArea(null); }}
+                      className={`px-4 py-2 rounded-full text-sm font-medium transition-all hover-lift ${
+                        selectedParish === parish.name
+                          ? 'bg-green-600 text-white shadow-lg scale-105'
+                          : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+                      }`}
+                      style={{ animationDelay: `${i * 0.05}s` }}
                     >
                       {parish.name}
-                    </text>
-
-                    {/* Energy percentage */}
-                    <text
-                      x={parish.cx}
-                      y={parish.cy + 5}
-                      textAnchor="middle"
-                      fill="white"
-                      fontSize="11"
-                      fontWeight="bold"
-                      className="pointer-events-none select-none"
-                      style={{ textShadow: "1px 1px 2px rgba(0,0,0,0.5)" }}
-                    >
-                      {parish.energyUsage}%
-                    </text>
-
-                    {/* Heat indicator circle */}
-                    <circle
-                      cx={parish.cx}
-                      cy={parish.cy + 18}
-                      r="8"
-                      fill={getHeatmapColor(parish.energyUsage)}
-                      opacity="0.9"
-                      className="pointer-events-none"
-                    />
-                  </g>
-                );
-              })}
-            </g>
-
-            {/* Jamaica outline border */}
-            <path
-              d={jamaicaOutline}
-              fill="none"
-              stroke="#047857"
-              strokeWidth="4"
-              opacity="0.5"
-            />
-
-            {/* Compass rose */}
-            <g transform="translate(720, 260)">
-              <circle cx="0" cy="0" r="25" fill="white" opacity="0.9" />
-              <path d="M0,-20 L5,0 L0,20 L-5,0 Z" fill="#ef4444" />
-              <text x="0" y="-25" textAnchor="middle" fontSize="10" fontWeight="bold" fill="#ef4444">N</text>
-            </g>
-
-            {/* Scale bar */}
-            <g transform="translate(50, 270)">
-              <rect x="0" y="0" width="100" height="4" fill="white" opacity="0.8" />
-              <text x="50" y="15" textAnchor="middle" fontSize="9" fill="white">50 km</text>
-            </g>
-
-            {/* Tooltip for hovered parish */}
-            {hoveredParish && !selectedParish && (
-              <foreignObject x="580" y="10" width="210" height="140">
-                <div className="bg-white/95 dark:bg-gray-800/95 backdrop-blur rounded-lg p-4 shadow-xl border border-gray-200 dark:border-gray-700">
-                  {(() => {
-                    const p = jamaicaParishes.find((par) => par.id === hoveredParish);
-                    return p ? (
-                      <div>
-                        <div className="flex items-center gap-2 mb-2">
-                          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: p.color }} />
-                          <div className="font-bold text-gray-800 dark:text-white">{p.name}</div>
-                        </div>
-                        <div className="text-sm text-gray-600 dark:text-gray-300 mb-2">
-                          Energy Usage: <span className="font-semibold" style={{ color: getHeatmapColor(p.energyUsage) }}>{p.energyUsage}%</span>
-                        </div>
-                        <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden mb-2">
-                          <div className="h-full rounded-full transition-all" style={{ width: `${p.energyUsage}%`, backgroundColor: getHeatmapColor(p.energyUsage) }} />
-                        </div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400">
-                          {p.neighborhoods.length} neighborhoods • {p.neighborhoods.reduce((sum, n) => sum + n.streets.length, 0)} streets
-                        </div>
-                        <div className="mt-2 text-xs text-ecosync-green font-medium">Click to explore →</div>
-                      </div>
-                    ) : null;
-                  })()}
+                    </button>
+                  ))}
                 </div>
-              </foreignObject>
-            )}
-          </svg>
-        ) : zoomLevel === 2 ? (
-          // Neighborhoods View
-          <div className="w-full h-full p-8">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 h-full">
-              {selectedParishData?.neighborhoods.map((neighborhood, index) => {
-                const isHovered = hoveredNeighborhood === neighborhood.name;
-                const isSelected = selectedNeighborhood === neighborhood.name;
-                const isUserLocation = userLocation?.neighborhood === neighborhood.name;
+              </div>
+            </div>
 
-                return (
-                  <div
-                    key={neighborhood.name}
-                    onClick={() => handleNeighborhoodClick(neighborhood.name)}
-                    onMouseEnter={() => setHoveredNeighborhood(neighborhood.name)}
-                    onMouseLeave={() => setHoveredNeighborhood(null)}
-                    className={`relative rounded-xl p-4 cursor-pointer transition-all duration-300 hover:scale-105 ${
-                      isSelected ? "ring-4 ring-ecosync-green" : isHovered ? "ring-4 ring-white dark:ring-gray-600" : ""
-                    }`}
-                    style={{
-                      background: `linear-gradient(135deg, ${getHeatmapColor(neighborhood.energyUsage)}22, ${getHeatmapColor(neighborhood.energyUsage)}44)`,
-                      border: `3px solid ${getHeatmapColor(neighborhood.energyUsage)}`,
-                    }}
-                  >
-                    {isUserLocation && (
-                      <div className="absolute -top-2 -right-2 bg-ecosync-green text-white text-xs px-2 py-1 rounded-full font-semibold">Your Area</div>
-                    )}
-                    <div className="flex items-center gap-2 mb-2">
-                      <LocationIcon />
-                      <h4 className="font-bold text-gray-800 dark:text-white">{neighborhood.name}</h4>
-                    </div>
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-gray-600 dark:text-gray-400">Energy Usage</span>
-                        <span className="font-semibold">{neighborhood.energyUsage}%</span>
+            {/* Heatmap Display */}
+            <div className="bg-white dark:bg-gray-800 rounded-3xl p-8 border border-gray-200 dark:border-gray-700 shadow-2xl fade-in-up">
+              {!selectedParish ? (
+                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+                  {jamaicaParishes.map((parish, i) => (
+                    <button
+                      key={parish.name}
+                      onClick={() => { setSelectedParish(parish.name); setSelectedArea(null); }}
+                      className="p-6 rounded-2xl heatmap-glow hover:scale-110 transition-all pulse-glow"
+                      style={{ 
+                        background: getHeatGradient(parish.energy),
+                        animationDelay: `${i * 0.1}s`
+                      }}
+                    >
+                      <div className="text-white">
+                        <div className="font-bold text-sm mb-1">{parish.name}</div>
+                        <div className="text-2xl font-extrabold">{parish.energy}%</div>
+                        <div className="text-xs opacity-80">energy usage</div>
                       </div>
-                      <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-                        <div className="h-full rounded-full transition-all duration-500" style={{ width: `${neighborhood.energyUsage}%`, backgroundColor: getHeatmapColor(neighborhood.energyUsage) }} />
-                      </div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400">{neighborhood.streets.length} streets</div>
-                    </div>
+                    </button>
+                  ))}
+                </div>
+              ) : selectedParishData?.areas ? (
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-2xl font-bold text-gray-900 dark:text-white fade-in-left">🇯🇲 {selectedParish} Parish</h3>
+                    <button onClick={() => { setSelectedParish(null); setSelectedArea(null); }} className="text-green-600 hover:underline hover:scale-105 transition-transform">
+                      ← Back to All Parishes
+                    </button>
                   </div>
-                );
-              })}
+                  <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {selectedParishData.areas.map((area, i) => {
+                      const areaEnergy = Math.floor(50 + Math.random() * 45);
+                      return (
+                        <button
+                          key={area}
+                          onClick={() => setSelectedArea(area)}
+                          className="p-6 rounded-2xl heatmap-glow hover:scale-105 transition-all"
+                          style={{ 
+                            background: getHeatGradient(areaEnergy),
+                            animationDelay: `${i * 0.1}s`
+                          }}
+                        >
+                          <div className="text-white text-left">
+                            <div className="font-semibold">{area}</div>
+                            <div className="text-2xl font-bold">{areaEnergy}%</div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {selectedArea && (
+                    <div className="bg-gray-50 dark:bg-gray-900 rounded-2xl p-6 border border-gray-200 dark:border-gray-700 fade-in-up">
+                      <h4 className="text-xl font-bold text-gray-900 dark:text-white mb-4">{selectedArea} - Street Level</h4>
+                      <div className="space-y-3">
+                        {[1, 2, 3, 4, 5].map((street) => {
+                          const streetEnergy = Math.floor(40 + Math.random() * 50);
+                          return (
+                            <div key={street} className="flex items-center gap-4 fade-in-right">
+                              <span className="text-sm text-gray-600 dark:text-gray-400 w-20">Street {street}</span>
+                              <div className="flex-1 h-6 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                                <div className="h-full rounded-full transition-all shimmer" style={{ width: `${streetEnergy}%`, background: getHeatColor(streetEnergy) }} />
+                              </div>
+                              <span className="text-sm font-medium text-gray-700 dark:text-gray-300 w-12 text-right">{streetEnergy}%</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : null}
+            </div>
+
+            {/* Legend */}
+            <div className="mt-6 flex items-center justify-center gap-6 text-sm fade-in-up">
+              <div className="flex items-center gap-2 hover-lift">
+                <div className="w-6 h-6 rounded" style={{ background: getHeatColor(25) }} />
+                <span className="text-gray-600 dark:text-gray-400">Low Usage</span>
+              </div>
+              <div className="flex items-center gap-2 hover-lift">
+                <div className="w-6 h-6 rounded" style={{ background: getHeatColor(50) }} />
+                <span className="text-gray-600 dark:text-gray-400">Medium</span>
+              </div>
+              <div className="flex items-center gap-2 hover-lift">
+                <div className="w-6 h-6 rounded" style={{ background: getHeatColor(85) }} />
+                <span className="text-gray-600 dark:text-gray-400">High Usage</span>
+              </div>
             </div>
           </div>
-        ) : (
-          // Streets View
-          <div className="w-full h-full p-8 overflow-auto">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {selectedNeighborhoodData?.streets.map((street, index) => {
-                const streetUsage = Math.floor(selectedNeighborhoodData.energyUsage * (0.8 + Math.random() * 0.4));
-                return (
-                  <div key={street} className="rounded-xl p-4 bg-white dark:bg-gray-800 shadow-lg border-2" style={{ borderColor: getHeatmapColor(streetUsage) }}>
-                    <div className="flex items-center gap-2 mb-3">
-                      <LocationIcon />
-                      <h4 className="font-bold text-gray-800 dark:text-white">{street}</h4>
-                    </div>
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-gray-600 dark:text-gray-400">Energy Usage</span>
-                        <span className="font-semibold">{streetUsage}%</span>
-                      </div>
-                      <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-                        <div className="h-full rounded-full transition-all duration-500" style={{ width: `${streetUsage}%`, backgroundColor: getHeatmapColor(streetUsage) }} />
-                      </div>
-                      <div className="grid grid-cols-3 gap-2 mt-3">
-                        <div className="text-center">
-                          <div className="text-xs text-gray-500 dark:text-gray-400">Solar</div>
-                          <div className="font-semibold text-energy-solar">{Math.floor(streetUsage * 0.3)}%</div>
-                        </div>
-                        <div className="text-center">
-                          <div className="text-xs text-gray-500 dark:text-gray-400">Wind</div>
-                          <div className="font-semibold text-energy-wind">{Math.floor(streetUsage * 0.25)}%</div>
-                        </div>
-                        <div className="text-center">
-                          <div className="text-xs text-gray-500 dark:text-gray-400">Grid</div>
-                          <div className="font-semibold text-gray-600 dark:text-gray-300">{Math.floor(streetUsage * 0.45)}%</div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
+        </section>
+
+        {/* Features Section */}
+        <section id="features" className="py-20 px-4">
+          <div className="max-w-7xl mx-auto">
+            <div className="text-center mb-16 fade-in-up">
+              <h2 className="text-3xl md:text-5xl font-extrabold text-gray-900 dark:text-white mb-4">
+                Why Choose <span className="text-green-600">EcoSync</span>
+              </h2>
             </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// Energy Resources Section with Heatmap
-function ResourcesSection() {
-  const [selectedParish, setSelectedParish] = useState<string | null>(null);
-  const [selectedNeighborhood, setSelectedNeighborhood] = useState<string | null>(null);
-  const [zoomLevel, setZoomLevel] = useState(1);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [showLocationModal, setShowLocationModal] = useState(true);
-  const [locationPermissionGranted, setLocationPermissionGranted] = useState(false);
-  const [userLocation, setUserLocation] = useState<{ parish: string; neighborhood: string } | null>(null);
-  const [customAreas, setCustomAreas] = useState<Array<{ name: string; energyUsage: number; parish: string; neighborhood: string }>>([]);
-
-  const handleAllowLocation = useCallback(() => {
-    if ("geolocation" in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const randomParish = jamaicaParishes[Math.floor(Math.random() * jamaicaParishes.length)];
-          const randomNeighborhood = randomParish.neighborhoods[Math.floor(Math.random() * randomParish.neighborhoods.length)];
-          
-          setUserLocation({ parish: randomParish.name, neighborhood: randomNeighborhood.name });
-          setCustomAreas((prev) => [
-            ...prev,
-            { name: `My Location (${randomNeighborhood.name})`, energyUsage: randomNeighborhood.energyUsage, parish: randomParish.name, neighborhood: randomNeighborhood.name },
-          ]);
-          setSelectedParish(randomParish.id);
-          setZoomLevel(2);
-          setLocationPermissionGranted(true);
-          setShowLocationModal(false);
-        },
-        (error) => {
-          console.error("Location error:", error);
-          const randomParish = jamaicaParishes[Math.floor(Math.random() * jamaicaParishes.length)];
-          const randomNeighborhood = randomParish.neighborhoods[Math.floor(Math.random() * randomParish.neighborhoods.length)];
-          setUserLocation({ parish: randomParish.name, neighborhood: randomNeighborhood.name });
-          setLocationPermissionGranted(false);
-          setShowLocationModal(false);
-        }
-      );
-    } else {
-      setShowLocationModal(false);
-    }
-  }, []);
-
-  const handleDenyLocation = useCallback(() => {
-    setShowLocationModal(false);
-    const randomParish = jamaicaParishes[Math.floor(Math.random() * jamaicaParishes.length)];
-    const randomNeighborhood = randomParish.neighborhoods[Math.floor(Math.random() * randomParish.neighborhoods.length)];
-    setUserLocation({ parish: randomParish.name, neighborhood: randomNeighborhood.name });
-  }, []);
-
-  const filteredParishes = jamaicaParishes.filter((parish) => parish.name.toLowerCase().includes(searchQuery.toLowerCase()));
-
-  return (
-    <section id="resources" className="py-24 bg-gradient-to-br from-ecosync-green-pale/50 via-ecosync-blue-pale/30 to-ecosync-purple-pale/50 dark:from-gray-800 dark:via-gray-900 dark:to-gray-800">
-      <LocationPermissionModal isOpen={showLocationModal} onAllow={handleAllowLocation} onDeny={handleDenyLocation} />
-      
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-16">
-          <h2 className="text-4xl md:text-5xl font-bold text-black dark:text-white mb-4">
-            Jamaica Energy <span className="text-ecosync-green">Heatmap</span>
-          </h2>
-          <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
-            Explore energy consumption patterns across Jamaica. Click on any parish to view neighborhoods, 
-            then click a neighborhood to see street-level data.
-          </p>
-        </div>
-
-        {/* Search Bar */}
-        <div className="max-w-md mx-auto mb-8">
-          <div className="relative">
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search parishes..."
-              className="w-full pl-12 pr-4 py-3 rounded-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:border-ecosync-green focus:ring-2 focus:ring-ecosync-green/20 outline-none transition-all"
-            />
-            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"><SearchIcon /></div>
-          </div>
-        </div>
-
-        {/* Interactive Heatmap */}
-        <div className="bg-white dark:bg-gray-800 rounded-3xl p-8 shadow-xl border border-gray-100 dark:border-gray-700 mb-12">
-          <JamaicaHeatmap
-            selectedParish={selectedParish}
-            selectedNeighborhood={selectedNeighborhood}
-            onParishSelect={setSelectedParish}
-            onNeighborhoodSelect={setSelectedNeighborhood}
-            zoomLevel={zoomLevel}
-            onZoomChange={setZoomLevel}
-            userLocation={userLocation}
-          />
-        </div>
-
-        {/* Custom Areas (User's Location) */}
-        {customAreas.length > 0 && (
-          <div className="bg-white dark:bg-gray-800 rounded-2xl p-8 shadow-lg border border-gray-100 dark:border-gray-700 mb-12">
-            <h3 className="text-2xl font-bold text-black dark:text-white mb-6 flex items-center gap-3">
-              <LocationIcon />
-              Your Area Energy Data
-            </h3>
-            <div className="grid md:grid-cols-2 gap-6">
-              {customAreas.map((area, index) => (
-                <div key={index} className="p-6 bg-gradient-to-br rounded-xl border-2" style={{ 
-                  borderColor: getHeatmapColor(area.energyUsage),
-                  background: `linear-gradient(135deg, ${getHeatmapColor(area.energyUsage)}11, ${getHeatmapColor(area.energyUsage)}22)`
-                }}>
-                  <div className="flex items-center justify-between mb-4">
-                    <div>
-                      <h4 className="font-bold text-lg text-gray-800 dark:text-white">{area.name}</h4>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">{area.neighborhood}, {area.parish}</p>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-3xl font-bold" style={{ color: getHeatmapColor(area.energyUsage) }}>{area.energyUsage}%</div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400">Energy Usage</div>
-                    </div>
-                  </div>
-                  <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-                    <div className="h-full rounded-full transition-all duration-500" style={{ width: `${area.energyUsage}%`, backgroundColor: getHeatmapColor(area.energyUsage) }} />
-                  </div>
-                  <div className="mt-4 flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                    <CheckIcon />
-                    <span>Location-based data</span>
-                  </div>
+            <div className="grid md:grid-cols-3 gap-8">
+              {[
+                { icon: '📊', title: 'Real-Time Tracking', description: 'Monitor your energy usage as it happens with live data' },
+                { icon: '🤖', title: 'AI Recommendations', description: 'Get personalized tips to reduce waste and save money' },
+                { icon: '💰', title: 'Cost Savings', description: 'Track your bills and discover ways to cut costs' },
+              ].map((feature, i) => (
+                <div key={i} className="bg-white dark:bg-black rounded-2xl p-8 shadow-lg card-hover border border-gray-200 dark:border-gray-800 gradient-border fade-in-up">
+                  <div className="text-4xl mb-4 float">{feature.icon}</div>
+                  <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-3">{feature.title}</h3>
+                  <p className="text-gray-600 dark:text-gray-400">{feature.description}</p>
                 </div>
               ))}
             </div>
           </div>
-        )}
+        </section>
 
-        {/* Parish Quick Reference */}
-        <div className="bg-white dark:bg-gray-800 rounded-2xl p-8 shadow-lg border border-gray-100 dark:border-gray-700">
-          <h3 className="text-2xl font-bold text-black dark:text-white mb-6">Parish Energy Overview</h3>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {filteredParishes.map((parish) => (
-              <button
-                key={parish.id}
-                onClick={() => { setSelectedParish(parish.id); setZoomLevel(2); }}
-                className={`p-4 rounded-xl border-2 transition-all duration-300 hover:shadow-lg ${
-                  selectedParish === parish.id ? "border-ecosync-green bg-ecosync-green-pale dark:bg-ecosync-green-pale/20" : "border-gray-200 dark:border-gray-700 hover:border-ecosync-green"
-                }`}
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <span className="font-semibold text-gray-800 dark:text-white text-sm">{parish.name}</span>
-                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: parish.color }} />
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-                    <div className="h-full rounded-full" style={{ width: `${parish.energyUsage}%`, backgroundColor: getHeatmapColor(parish.energyUsage) }} />
+        {/* Resources Section */}
+        <section id="resources" className="py-20 px-4 bg-green-50 dark:bg-gray-900">
+          <div className="max-w-7xl mx-auto">
+            <div className="text-center mb-16 fade-in-up">
+              <h2 className="text-3xl md:text-5xl font-extrabold text-gray-900 dark:text-white mb-4">
+                Learning <span className="text-green-600">Resources</span>
+              </h2>
+            </div>
+            <div className="grid md:grid-cols-3 gap-8">
+              {[
+                { title: 'Energy Saving Guide', desc: 'Comprehensive tips for every room', icon: '📖' },
+                { title: 'Renewable Options', desc: 'Solar, wind, and more for your home', icon: '☀️' },
+                { title: 'Rebate Programs', desc: 'Find incentives in your area', icon: '💵' },
+              ].map((resource, i) => (
+                <a key={i} href="#" className="bg-white dark:bg-black rounded-2xl overflow-hidden shadow-lg card-hover border border-gray-200 dark:border-gray-800 group fade-in-up">
+                  <div className="h-48 bg-green-50 dark:bg-gray-900 flex items-center justify-center text-6xl group-hover:scale-110 transition-transform bounce-slow">{resource.icon}</div>
+                  <div className="p-6">
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">{resource.title}</h3>
+                    <p className="text-gray-600 dark:text-gray-400">{resource.desc}</p>
                   </div>
-                  <span className="text-sm font-medium text-gray-600 dark:text-gray-400">{parish.energyUsage}%</span>
-                </div>
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-// How It Works Section
-function HowItWorksSection() {
-  const steps = [
-    { number: "01", title: "Connect Your Systems", description: "Integrate EcoSync with your existing infrastructure through our simple API or pre-built connectors for major platforms." },
-    { number: "02", title: "Monitor Energy Sources", description: "Real-time tracking of solar, wind, water, and grid energy availability with predictive analytics." },
-    { number: "03", title: "Automate Smart Scheduling", description: "High-energy tasks automatically shift to optimal renewable energy windows without manual intervention." },
-    { number: "04", title: "Track Your Impact", description: "Transparent dashboards show energy savings, cost reductions, and environmental impact in real-time." },
-  ];
-
-  return (
-    <section id="about" className="py-24 bg-gradient-to-br from-ecosync-black to-gray-900 text-white relative overflow-hidden">
-      <div className="absolute top-0 left-0 w-full h-full overflow-hidden">
-        <div className="absolute top-20 left-10 w-72 h-72 bg-ecosync-green/10 rounded-full blur-3xl" />
-        <div className="absolute bottom-20 right-10 w-72 h-72 bg-ecosync-blue/10 rounded-full blur-3xl" />
-      </div>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-        <div className="text-center mb-16">
-          <h2 className="text-4xl md:text-5xl font-bold mb-4">How <span className="text-ecosync-green">EcoSync</span> Works</h2>
-          <p className="text-xl text-gray-400 max-w-3xl mx-auto">Four simple steps to transform your energy consumption into a force for environmental good.</p>
-        </div>
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
-          {steps.map((step, index) => (
-            <div key={index} className="relative">
-              <div className="text-6xl font-bold text-ecosync-green/20 mb-4">{step.number}</div>
-              <h3 className="text-xl font-semibold mb-3">{step.title}</h3>
-              <p className="text-gray-400 leading-relaxed">{step.description}</p>
-              {index < steps.length - 1 && <div className="hidden lg:block absolute top-12 -right-4 w-8 h-0.5 bg-ecosync-green/30" />}
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-// CTA Section
-function CTASection({ onNavigate }: { onNavigate: (page: "home" | "auth") => void }) {
-  return (
-    <section className="py-24 bg-gradient-to-br from-ecosync-green via-ecosync-blue to-ecosync-purple relative overflow-hidden">
-      <div className="absolute inset-0 opacity-30">
-        <div className="absolute top-0 left-0 w-96 h-96 bg-white/20 rounded-full blur-3xl" />
-        <div className="absolute bottom-0 right-0 w-96 h-96 bg-white/20 rounded-full blur-3xl" />
-      </div>
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative z-10">
-        <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">Ready to Sync with Sustainability?</h2>
-        <p className="text-xl text-white/90 mb-10 max-w-2xl mx-auto">Join hundreds of enterprises reducing their energy waste while maintaining peak performance. Start your green transformation today.</p>
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-          <button onClick={() => onNavigate("auth")} className="w-full sm:w-auto px-8 py-4 bg-white text-ecosync-green font-semibold rounded-full hover:bg-gray-100 transition-all duration-300 shadow-xl hover:shadow-2xl hover:-translate-y-1 btn-primary flex items-center justify-center gap-2">
-            Start Free Trial <ArrowRightIcon />
-          </button>
-          <button className="w-full sm:w-auto px-8 py-4 bg-transparent text-white font-semibold rounded-full border-2 border-white hover:bg-white/10 transition-all duration-300 flex items-center justify-center gap-2">
-            <PlayIcon /> Contact Sales
-          </button>
-        </div>
-        <div className="mt-10 flex flex-wrap items-center justify-center gap-6 text-white/80 text-sm">
-          <div className="flex items-center gap-2"><CheckIcon /><span>14-day free trial</span></div>
-          <div className="flex items-center gap-2"><CheckIcon /><span>No credit card required</span></div>
-          <div className="flex items-center gap-2"><CheckIcon /><span>Enterprise support</span></div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-// Footer Component
-function Footer() {
-  const footerLinks = {
-    Product: ["Features", "Pricing", "API", "Documentation"],
-    Company: ["About", "Blog", "Careers", "Press"],
-    Resources: ["Case Studies", "Whitepapers", "Webinars", "Support"],
-    Legal: ["Privacy", "Terms", "Security", "Cookies"],
-  };
-
-  return (
-    <footer className="bg-ecosync-black text-white py-16">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid md:grid-cols-2 lg:grid-cols-6 gap-8 mb-12">
-          <div className="lg:col-span-2">
-            <div className="flex items-center gap-3 mb-4">
-              <EcoSyncLogo />
-              <span className="text-2xl font-bold">EcoSync</span>
-            </div>
-            <p className="text-gray-400 mb-6 max-w-xs">Intelligent sustainability orchestrator for a greener future.</p>
-            <div className="flex gap-4">
-              <div className="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center hover:bg-ecosync-green transition-colors cursor-pointer"><GlobeIcon /></div>
+                </a>
+              ))}
             </div>
           </div>
-          {Object.entries(footerLinks).map(([category, links]) => (
-            <div key={category}>
-              <h4 className="font-semibold mb-4">{category}</h4>
-              <ul className="space-y-3">
-                {links.map((link) => (<li key={link}><a href="#" className="text-gray-400 hover:text-ecosync-green transition-colors">{link}</a></li>))}
-              </ul>
-            </div>
-          ))}
-        </div>
-        <div className="border-t border-white/10 pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
-          <p className="text-gray-400 text-sm">© 2026 EcoSync. All rights reserved.</p>
-          <div className="flex items-center gap-6 text-sm text-gray-400">
-            <a href="#" className="hover:text-ecosync-green transition-colors">Privacy Policy</a>
-            <a href="#" className="hover:text-ecosync-green transition-colors">Terms of Service</a>
-          </div>
-        </div>
-      </div>
-    </footer>
-  );
-}
+        </section>
 
-// Main Home Component
-export default function Home() {
-  const [currentPage, setCurrentPage] = useState<"home" | "auth">("home");
-  const [isDarkMode, setIsDarkMode] = useState(false);
-
-  useEffect(() => {
-    const savedMode = localStorage.getItem("darkMode");
-    if (savedMode) setIsDarkMode(savedMode === "true");
-  }, []);
-
-  useEffect(() => {
-    if (isDarkMode) document.documentElement.classList.add("dark");
-    else document.documentElement.classList.remove("dark");
-    localStorage.setItem("darkMode", String(isDarkMode));
-  }, [isDarkMode]);
-
-  const handleNavigate = useCallback((page: "home" | "auth") => {
-    setCurrentPage(page);
-    window.scrollTo(0, 0);
-  }, []);
-
-  const handleToggleDarkMode = useCallback(() => setIsDarkMode((prev) => !prev), []);
-
-  if (currentPage === "auth") {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-ecosync-green-pale via-white to-ecosync-blue-pale dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
-        <Navigation onNavigate={handleNavigate} isDarkMode={isDarkMode} onToggleDarkMode={handleToggleDarkMode} />
-        <AuthPage onNavigate={handleNavigate} />
-      </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen bg-white dark:bg-gray-900 transition-colors duration-300">
-      <Navigation onNavigate={handleNavigate} isDarkMode={isDarkMode} onToggleDarkMode={handleToggleDarkMode} />
-      <HeroSection onNavigate={handleNavigate} />
-      <FeaturesSection />
-      <DashboardSection />
-      <ResourcesSection />
-      <HowItWorksSection />
-      <CTASection onNavigate={handleNavigate} />
-      <Footer />
-    </div>
-  );
-}
-
-// Auth Page Component
-function AuthPage({ onNavigate }: { onNavigate: (page: "home" | "auth") => void }) {
-  const [isSignIn, setIsSignIn] = useState(true);
-
-  return (
-    <div className="min-h-screen flex items-center justify-center px-4 py-20">
-      <div className="w-full max-w-md">
-        <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl p-8">
-          <div className="text-center mb-8">
-            <div className="flex justify-center mb-4"><EcoSyncLogo /></div>
-            <h1 className="text-3xl font-bold text-black dark:text-white mb-2">{isSignIn ? "Welcome Back" : "Create Account"}</h1>
-            <p className="text-gray-600 dark:text-gray-300">{isSignIn ? "Sign in to access your dashboard" : "Start your energy saving journey"}</p>
-          </div>
-          <form className="space-y-4">
-            {!isSignIn && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Full Name</label>
-                <input type="text" className="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:border-ecosync-green focus:ring-2 focus:ring-ecosync-green/20 outline-none transition-all" placeholder="John Doe" />
+        {/* About Section */}
+        <section id="about" className="py-20 px-4">
+          <div className="max-w-7xl mx-auto">
+            <div className="grid md:grid-cols-2 gap-12 items-center">
+              <div className="fade-in-left">
+                <h2 className="text-3xl md:text-5xl font-extrabold text-gray-900 dark:text-white mb-6">
+                  Our <span className="text-green-600">Mission</span>
+                </h2>
+                <p className="text-lg text-gray-600 dark:text-gray-400 mb-6">
+                  EcoSync empowers communities to reduce energy waste through data-driven insights and actionable recommendations.
+                </p>
+                <p className="text-lg text-gray-600 dark:text-gray-400 mb-8">
+                  Together, we can build a more sustainable future by making informed decisions about our energy consumption.
+                </p>
               </div>
-            )}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Email</label>
-              <input type="email" className="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:border-ecosync-green focus:ring-2 focus:ring-ecosync-green/20 outline-none transition-all" placeholder="you@example.com" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Password</label>
-              <input type="password" className="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:border-ecosync-green focus:ring-2 focus:ring-ecosync-green/20 outline-none transition-all" placeholder="••••••••" />
-            </div>
-            {isSignIn && (
-              <div className="flex items-center justify-between">
-                <label className="flex items-center">
-                  <input type="checkbox" className="w-4 h-4 rounded border-gray-300 text-ecosync-green focus:ring-ecosync-green" />
-                  <span className="ml-2 text-sm text-gray-600 dark:text-gray-400">Remember me</span>
-                </label>
-                <a href="#" className="text-sm text-ecosync-green hover:underline">Forgot password?</a>
+              <div className="bg-white dark:bg-black rounded-3xl p-8 shadow-xl border border-gray-200 dark:border-gray-800 text-center fade-in-right">
+                <div className="text-6xl mb-4 float">🌍</div>
+                <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">One Planet. One Future.</h3>
+                <p className="text-gray-600 dark:text-gray-400">Join the conservation movement today</p>
               </div>
-            )}
-            <button type="submit" className="w-full px-6 py-3 bg-ecosync-green text-white font-semibold rounded-full hover:bg-ecosync-green-dark transition-all duration-300 shadow-lg hover:shadow-xl">{isSignIn ? "Sign In" : "Create Account"}</button>
-          </form>
-          <div className="relative my-6">
-            <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-200 dark:border-gray-700" /></div>
-            <div className="relative flex justify-center text-sm"><span className="px-4 bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400">Or continue with</span></div>
+            </div>
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <button className="flex items-center justify-center gap-2 px-4 py-3 border-2 border-gray-200 dark:border-gray-700 rounded-xl hover:border-ecosync-green hover:bg-ecosync-green-pale dark:hover:bg-gray-700 transition-all">
-              <svg className="w-5 h-5" viewBox="0 0 24 24"><path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" /><path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" /><path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" /><path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" /></svg>
-              <span className="font-medium">Google</span>
-            </button>
-            <button className="flex items-center justify-center gap-2 px-4 py-3 border-2 border-gray-200 dark:border-gray-700 rounded-xl hover:border-ecosync-green hover:bg-ecosync-green-pale dark:hover:bg-gray-700 transition-all">
-              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z" /></svg>
-              <span className="font-medium">GitHub</span>
-            </button>
-          </div>
-          <div className="mt-8 text-center">
-            <p className="text-gray-600 dark:text-gray-400">
-              {isSignIn ? "Don't have an account?" : "Already have an account?"}{" "}
-              <button onClick={() => setIsSignIn(!isSignIn)} className="text-ecosync-green font-semibold hover:underline">{isSignIn ? "Sign Up" : "Sign In"}</button>
+        </section>
+
+        {/* CTA Section */}
+        <section className="py-20 px-4 bg-green-600 animated-gradient">
+          <div className="max-w-4xl mx-auto text-center fade-in-up">
+            <h2 className="text-3xl md:text-5xl font-extrabold text-white mb-6">
+              Ready to Make a Difference?
+            </h2>
+            <p className="text-xl text-white/90 mb-8">
+              Start your energy conservation journey today
             </p>
+            <Link href="/auth/register" className="inline-block px-8 py-4 bg-white text-green-600 font-bold rounded-full hover:shadow-2xl hover:scale-105 transition-all">
+              Get Started Free →
+            </Link>
           </div>
-          <div className="mt-6 text-center">
-            <button onClick={() => onNavigate("home")} className="text-gray-600 dark:text-gray-400 hover:text-ecosync-green transition-colors text-sm">← Back to Home</button>
+        </section>
+
+        {/* Footer */}
+        <footer className="py-12 px-4 bg-black text-white">
+          <div className="max-w-7xl mx-auto">
+            <div className="grid md:grid-cols-4 gap-8 mb-8">
+              <div className="fade-in-up">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 rounded-xl animated-gradient flex items-center justify-center">
+                    <svg className="w-6 h-6 text-white" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M12 2C8.5 2 5 4.5 5 8c0 2.5 1.5 4.5 3.5 5.5C8 15 7 17 7 19c0 2.5 2.5 3 5 3s5-.5 5-3c0-2-1-4-1.5-5.5C17.5 12.5 19 10.5 19 8c0-3.5-3.5-6-7-6zm0 2c2.5 0 5 1.5 5 4 0 1.5-.5 2.5-1.5 3.5-.5-1.5-1.5-3-3.5-3s-3 1.5-3.5 3C7.5 10.5 7 9.5 7 8c0-2.5 2.5-4 5-4z"/>
+                      <ellipse cx="12" cy="18" rx="4" ry="2" opacity="0.6"/>
+                    </svg>
+                  </div>
+                  <span className="text-xl font-bold">EcoSync</span>
+                </div>
+                <p className="text-gray-400 text-sm">Empowering sustainable energy choices</p>
+              </div>
+              <div className="fade-in-up stagger-1">
+                <h4 className="font-semibold mb-4">Product</h4>
+                <ul className="space-y-2 text-gray-400 text-sm">
+                  <li><Link href="#features" className="hover:text-white transition-colors">Features</Link></li>
+                  <li><Link href="#dashboard" className="hover:text-white transition-colors">Dashboard</Link></li>
+                  <li><Link href="#resources" className="hover:text-white transition-colors">Resources</Link></li>
+                </ul>
+              </div>
+              <div className="fade-in-up stagger-2">
+                <h4 className="font-semibold mb-4">Company</h4>
+                <ul className="space-y-2 text-gray-400 text-sm">
+                  <li><Link href="#about" className="hover:text-white transition-colors">About</Link></li>
+                  <li><a href="#" className="hover:text-white transition-colors">Careers</a></li>
+                  <li><a href="#" className="hover:text-white transition-colors">Contact</a></li>
+                </ul>
+              </div>
+              <div className="fade-in-up stagger-3">
+                <h4 className="font-semibold mb-4">Legal</h4>
+                <ul className="space-y-2 text-gray-400 text-sm">
+                  <li><a href="#" className="hover:text-white transition-colors">Privacy</a></li>
+                  <li><a href="#" className="hover:text-white transition-colors">Terms</a></li>
+                </ul>
+              </div>
+            </div>
+            <div className="border-t border-gray-800 pt-8 text-center text-gray-400 text-sm">
+              <p>© 2026 EcoSync Jamaica. All rights reserved.</p>
+            </div>
           </div>
-        </div>
+        </footer>
+
+        {/* Floating Map Button */}
+        {showMapButton && (
+          <a
+            href="#dashboard"
+            className="fixed bottom-8 right-8 z-[9999] px-6 py-4 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold rounded-full shadow-2xl hover:shadow-3xl transition-all hover:scale-110 flex items-center gap-3 animate-bounce-slow"
+          >
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+            </svg>
+            View Energy Map
+          </a>
+        )}
       </div>
     </div>
   );

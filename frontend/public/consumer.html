@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EcoSync - Consumer Dashboard</title>
+  <style>
+    :root {
+      --ecosync-green: #10b981;
+      --ecosync-green-dark: #059669;
+      --ecosync-green-light: #34d399;
+      --ecosync-green-pale: #d1fae5;
+      --ecosync-blue: #3b82f6;
+      --ecosync-blue-light: #60a5fa;
+      --ecosync-blue-pale: #dbeafe;
+      --ecosync-purple: #8b5cf6;
+      --ecosync-purple-light: #a78bfa;
+      --ecosync-purple-pale: #ede9fe;
+      --ecosync-amber: #f59e0b;
+      --ecosync-cyan: #06b6d4;
+      --gray-50: #f9fafb;
+      --gray-100: #f3f4f6;
+      --gray-200: #e5e7eb;
+      --gray-300: #d1d5db;
+      --gray-400: #9ca3af;
+      --gray-500: #6b7280;
+      --gray-600: #4b5563;
+      --gray-700: #374151;
+      --gray-800: #1f2937;
+      --gray-900: #111827;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      background: linear-gradient(135deg, var(--ecosync-green-pale) 0%, #ffffff 50%, var(--ecosync-blue-pale) 100%);
+      min-height: 100vh;
+      color: var(--gray-900);
+    }
+
+    /* Navigation */
+    .nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(10px);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      z-index: 100;
+    }
+
+    .nav-content {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 1rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      text-decoration: none;
+      color: var(--gray-900);
+    }
+
+    .logo-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, var(--ecosync-green), var(--ecosync-blue), var(--ecosync-purple));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: bold;
+      font-size: 1.25rem;
+    }
+
+    .logo-text {
+      font-size: 1.25rem;
+      font-weight: 700;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 1rem;
+      align-items: center;
+    }
+
+    .nav-link {
+      text-decoration: none;
+      color: var(--gray-600);
+      font-weight: 500;
+      padding: 0.5rem 1rem;
+      border-radius: 9999px;
+      transition: all 0.2s;
+    }
+
+    .nav-link:hover {
+      background: var(--gray-100);
+      color: var(--gray-900);
+    }
+
+    .nav-link.active {
+      background: var(--ecosync-green);
+      color: white;
+    }
+
+    .btn-primary {
+      background: var(--ecosync-green);
+      color: white;
+      padding: 0.625rem 1.5rem;
+      border-radius: 9999px;
+      text-decoration: none;
+      font-weight: 600;
+      transition: all 0.2s;
+      border: none;
+      cursor: pointer;
+    }
+
+    .btn-primary:hover {
+      background: var(--ecosync-green-dark);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+    }
+
+    /* Main Content */
+    .main {
+      padding-top: 5rem;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 2rem;
+    }
+
+    /* Header */
+    .dashboard-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 2rem;
+    }
+
+    .dashboard-title h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--gray-900);
+      margin-bottom: 0.25rem;
+    }
+
+    .dashboard-title p {
+      color: var(--gray-600);
+    }
+
+    /* Status Indicator */
+    .status-indicator {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .status-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--ecosync-green);
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    .status-text {
+      font-weight: 600;
+      color: var(--ecosync-green);
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    /* Alert Banner */
+    .alert-banner {
+      background: var(--ecosync-green-pale);
+      border: 2px solid var(--ecosync-green);
+      border-radius: 12px;
+      padding: 1rem 1.25rem;
+      margin-bottom: 2rem;
+      display: flex;
+      align-items: flex-start;
+      gap: 0.75rem;
+    }
+
+    .alert-icon {
+      font-size: 1.25rem;
+    }
+
+    .alert-content h4 {
+      font-weight: 600;
+      color: var(--ecosync-green-dark);
+      margin-bottom: 0.25rem;
+    }
+
+    .alert-content p {
+      color: var(--ecosync-green-dark);
+      opacity: 0.8;
+      font-size: 0.875rem;
+    }
+
+    /* Metrics Grid */
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1.5rem;
+      margin-bottom: 2rem;
+    }
+
+    .metric-card {
+      background: white;
+      border-radius: 16px;
+      padding: 1.5rem;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.07);
+      border: 1px solid var(--gray-200);
+    }
+
+    .metric-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+
+    .metric-icon {
+      width: 40px;
+      height: 40px;
+      background: var(--ecosync-green-pale);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--ecosync-green);
+    }
+
+    .metric-trend {
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: var(--ecosync-green);
+    }
+
+    .metric-value {
+      font-size: 2.5rem;
+      font-weight: 700;
+      color: var(--gray-900);
+      margin-bottom: 0.25rem;
+    }
+
+    .metric-unit {
+      font-size: 1rem;
+      color: var(--gray-500);
+      margin-left: 0.25rem;
+    }
+
+    .metric-label {
+      color: var(--gray-600);
+      font-size: 0.875rem;
+    }
+
+    /* Secondary Grid */
+    .secondary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 1.5rem;
+    }
+
+    .info-card {
+      background: white;
+      border-radius: 16px;
+      padding: 1.5rem;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.07);
+      border: 1px solid var(--gray-200);
+    }
+
+    .info-card h3 {
+      font-size: 1.125rem;
+      font-weight: 600;
+      color: var(--gray-900);
+      margin-bottom: 1rem;
+    }
+
+    .info-value {
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--ecosync-green);
+      margin-bottom: 0.5rem;
+    }
+
+    .info-label {
+      color: var(--gray-600);
+      font-size: 0.875rem;
+      margin-bottom: 1rem;
+    }
+
+    .progress-bar {
+      height: 8px;
+      background: var(--gray-200);
+      border-radius: 9999px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: var(--ecosync-green);
+      border-radius: 9999px;
+      transition: width 0.3s ease;
+    }
+
+    .button-group {
+      display: flex;
+      gap: 0.5rem;
+      margin-top: 1rem;
+    }
+
+    .btn-secondary {
+      flex: 1;
+      padding: 0.5rem;
+      border: 1px solid var(--gray-300);
+      background: white;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+      color: var(--gray-700);
+      transition: all 0.2s;
+    }
+
+    .btn-secondary:hover {
+      background: var(--gray-50);
+      border-color: var(--gray-400);
+    }
+
+    .btn-secondary.btn-plus {
+      background: var(--ecosync-green);
+      color: white;
+      border-color: var(--ecosync-green);
+    }
+
+    .btn-secondary.btn-plus:hover {
+      background: var(--ecosync-green-dark);
+    }
+
+    /* Footer */
+    .footer {
+      margin-top: 4rem;
+      padding: 2rem;
+      background: var(--gray-900);
+      color: white;
+      text-align: center;
+    }
+
+    .footer-logo {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+
+    .footer-logo-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, var(--ecosync-green), var(--ecosync-blue), var(--ecosync-purple));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: bold;
+    }
+
+    .footer-text {
+      color: var(--gray-400);
+      font-size: 0.875rem;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .nav-content {
+        padding: 1rem;
+      }
+
+      .nav-links {
+        display: none;
+      }
+
+      .container {
+        padding: 1rem;
+      }
+
+      .dashboard-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1rem;
+      }
+
+      .metrics-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .secondary-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Navigation -->
+  <nav class="nav">
+    <div class="nav-content">
+      <a href="/" class="logo">
+        <div class="logo-icon">E</div>
+        <span class="logo-text">EcoSync</span>
+      </a>
+      <div class="nav-links">
+        <a href="/consumer.html" class="nav-link active">Consumer</a>
+        <a href="/enterprise.html" class="nav-link">Enterprise</a>
+        <a href="/datacenter.html" class="nav-link">Data Center</a>
+      </div>
+      <a href="/" class="btn-primary">Back to Home</a>
+    </div>
+  </nav>
+
+  <!-- Main Content -->
+  <main class="main">
+    <div class="container">
+      <!-- Header -->
+      <div class="dashboard-header">
+        <div class="dashboard-title">
+          <h1>Consumer Dashboard</h1>
+          <p>Monitor and optimize your home energy</p>
+        </div>
+        <div class="status-indicator">
+          <div class="status-dot"></div>
+          <span class="status-text">Optimal</span>
+        </div>
+      </div>
+
+      <!-- Alert Banner -->
+      <div class="alert-banner">
+        <span class="alert-icon">✅</span>
+        <div class="alert-content">
+          <h4>Energy Optimization Active</h4>
+          <p>Your solar panels are generating excess power. Consider running high-consumption appliances now.</p>
+        </div>
+      </div>
+
+      <!-- Primary Metrics -->
+      <div class="metrics-grid">
+        <div class="metric-card">
+          <div class="metric-header">
+            <div class="metric-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" fill="currentColor"/>
+              </svg>
+            </div>
+            <span class="metric-trend">↑ Stable</span>
+          </div>
+          <div class="metric-value">2,450<span class="metric-unit">W</span></div>
+          <div class="metric-label">Current Power</div>
+        </div>
+
+        <div class="metric-card">
+          <div class="metric-header">
+            <div class="metric-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="5" fill="currentColor"/>
+                <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <span class="metric-trend">↑ +12% today</span>
+          </div>
+          <div class="metric-value">3,200<span class="metric-unit">W</span></div>
+          <div class="metric-label">Solar Generation</div>
+        </div>
+
+        <div class="metric-card">
+          <div class="metric-header">
+            <div class="metric-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                <path d="M12 21c4.97-4.97 7-9 7-14-4.97 0-9 2.03-14 7 0 5 2.03 9.03 7 14z" fill="currentColor"/>
+              </svg>
+            </div>
+            <span class="metric-trend">↑ today</span>
+          </div>
+          <div class="metric-value">4.2<span class="metric-unit">kg</span></div>
+          <div class="metric-label">Carbon Saved</div>
+        </div>
+
+        <div class="metric-card">
+          <div class="metric-header">
+            <div class="metric-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
+            <span class="metric-trend">↑ Charging</span>
+          </div>
+          <div class="metric-value">78<span class="metric-unit">%</span></div>
+          <div class="metric-label">Battery Level</div>
+        </div>
+      </div>
+
+      <!-- Secondary Metrics -->
+      <div class="secondary-grid">
+        <div class="info-card">
+          <h3>Active Appliances</h3>
+          <div class="info-value">5</div>
+          <div class="info-label">Devices currently using power</div>
+          <div class="progress-bar">
+            <div class="progress-fill" style="width: 50%"></div>
+          </div>
+        </div>
+
+        <div class="info-card">
+          <h3>HVAC Setpoint</h3>
+          <div class="info-value">22°C</div>
+          <div class="info-label">Target temperature</div>
+          <div class="button-group">
+            <button class="btn-secondary">-</button>
+            <button class="btn-secondary btn-plus">+</button>
+          </div>
+        </div>
+
+        <div class="info-card">
+          <h3>Home Occupancy</h3>
+          <div class="info-value">3</div>
+          <div class="info-label">People detected</div>
+          <div class="progress-bar">
+            <div class="progress-fill" style="width: 60%"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="footer-logo">
+      <div class="footer-logo-icon">E</div>
+      <span style="font-size: 1.25rem; font-weight: 700;">EcoSync</span>
+    </div>
+    <p class="footer-text">© 2026 EcoSync. Intelligent sustainability orchestration platform.</p>
+  </footer>
+
+  <script>
+    // Simulate real-time data updates
+    function updateMetrics() {
+      const metricValues = document.querySelectorAll('.metric-value');
+      metricValues.forEach(metric => {
+        const baseValue = metric.textContent;
+        if (baseValue.includes('W')) {
+          const newValue = Math.floor(2000 + Math.random() * 1500);
+          metric.innerHTML = newValue.toLocaleString() + '<span class="metric-unit">W</span>';
+        }
+      });
+    }
+
+    // Update every 5 seconds
+    setInterval(updateMetrics, 5000);
+  </script>
+</body>
+</html>

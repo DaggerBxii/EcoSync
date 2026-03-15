@@ -1,12 +1,12 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  output: "export",
+  // Static export disabled for development with WebSocket support
+  // output: "export",
   images: {
     unoptimized: true,
   },
-  basePath: "/EcoSync",
-  assetPrefix: "/EcoSync/",
+  // For production deployment with WebSocket, use SSR mode
 };
 
 export default nextConfig;
