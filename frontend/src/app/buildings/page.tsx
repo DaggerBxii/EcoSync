@@ -117,7 +117,7 @@ export default function BuildingsPage() {
               <Link
                 key={building.id}
                 href={`/buildings/${building.id}`}
-                className="group bg-background rounded-3xl p-8 shadow-lg border-2 border-border hover:border-green-600 transition-all hover:shadow-xl hover:-translate-y-1"
+                className="group bg-background rounded-3xl p-8 shadow-lg border-2 border-[hsl(var(--border))] hover:border-green-600 transition-all hover:shadow-xl hover:-translate-y-1"
               >
                 <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-green-600 to-green-400 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
                   <building.icon className="w-8 h-8 text-white" />
