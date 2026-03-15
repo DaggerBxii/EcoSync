@@ -229,10 +229,10 @@ class BuildingMetrics:
             "resources_by_status": self.resources_by_status,
             "active_alerts": self.active_alerts,
             "critical_alerts": self.critical_alerts,
-            "overall_efficiency": self.overall_efficiency,
-            "energy_consumption": self.energy_consumption,
-            "water_consumption": self.water_consumption,
-            "carbon_footprint": self.carbon_footprint
+            "overall_efficiency": round(self.overall_efficiency, 2),
+            "energy_consumption": round(self.energy_consumption, 2),
+            "water_consumption": round(self.water_consumption, 2),
+            "carbon_footprint": round(self.carbon_footprint, 2)
         }
 
 
@@ -818,6 +818,14 @@ class FloorSummary:
     area_sqft: float
 
     def to_dict(self) -> Dict[str, Any]:
+        # Round numerical values in total_consumption
+        rounded_total_consumption = {}
+        for key, value in self.total_consumption.items():
+            if isinstance(value, float):
+                rounded_total_consumption[key] = round(value, 2)
+            else:
+                rounded_total_consumption[key] = value
+
         return {
             "floor_number": self.floor_number,
             "zones": self.zones,
@@ -826,7 +834,7 @@ class FloorSummary:
             "resources_by_type": self.resources_by_type,
             "efficiency_by_type": self.efficiency_by_type,
             "overall_efficiency": round(self.overall_efficiency, 2),
-            "total_consumption": self.total_consumption,
+            "total_consumption": rounded_total_consumption,
             "active_alerts": self.active_alerts,
             "occupancy": self.occupancy,
             "max_occupancy": self.max_occupancy,

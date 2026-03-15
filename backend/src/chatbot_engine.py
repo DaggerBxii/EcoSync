@@ -424,8 +424,7 @@ Keep response under 3 sentences. Be friendly and professional."""
                 model=self.model_name,
                 contents=prompt,
                 config=types.GenerateContentConfig(
-                    temperature=0.7,
-                    max_output_tokens=200
+                    temperature=0.7
                 )
             )
             

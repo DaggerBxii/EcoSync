@@ -930,9 +930,9 @@ def _format_for_frontend(data: dict) -> dict:
     # Extract the metrics from the building metrics
     building_metrics = data.get("metrics", {})
     
-    # Calculate watts (sum of electricity resources)
+    # Calculate watts (sum of electricity resources) - keeping in kW for more realistic values
     electricity_resources = data_store.get_resources_by_type(ResourceType.ELECTRICITY)
-    total_watts = sum(r.current_value * 1000 for r in electricity_resources)  # Convert kW to W
+    total_kw = sum(r.current_value for r in electricity_resources)  # Keep in kW
     
     # Calculate occupancy (sum of all zone occupancies)
     total_occupancy = sum(zone.occupancy for zone in data_store.get_all_zones())
@@ -949,15 +949,15 @@ def _format_for_frontend(data: dict) -> dict:
     formatted_data = {
         "timestamp": data.get("timestamp", datetime.utcnow().isoformat() + "Z"),
         "system_status": data.get("system_status", "optimal"),
-        "scale_level": scale_level,
+        "scale_level": round(scale_level, 2),
         "metrics": {
-            "watts": round(total_watts, 2),
+            "watts": round(total_kw, 2),  # Keeping in kW for realistic values
             "occupancy": total_occupancy,
-            "carbon_saved": round(carbon_saved, 3)
+            "carbon_saved": round(carbon_saved, 2)
         },
         "ai_insight": data.get("building_insight", "Building operating normally."),
         "is_anomaly": data.get("is_anomaly", False),
-        "confidence_score": data.get("confidence_score", 0.85)
+        "confidence_score": round(data.get("confidence_score", 0.85), 2)
     }
     
     # Add optional fields if present in the original data
@@ -974,19 +974,29 @@ def _format_for_frontend(data: dict) -> dict:
 
 async def periodic_broadcast():
     """Periodically broadcast building data to all connected clients."""
+    last_data = None
+    
     while True:
         try:
-            # Get building decision from AI
+            # Get building decision from AI (with caching)
             data = ai_brain.get_building_decision()
             
+            # Format for frontend
+            formatted_data = _format_for_frontend(data)
+            last_data = formatted_data
+
             # Broadcast to all connected clients
-            await manager.broadcast(json.dumps(data))
-            
+            await manager.broadcast(json.dumps(formatted_data))
+
         except Exception as e:
             print(f"Error in periodic broadcast: {e}")
-        
-        # Wait before next broadcast
-        await asyncio.sleep(2)
+            
+            # Send last known good data if available
+            if last_data:
+                await manager.broadcast(json.dumps(last_data))
+
+        # Wait before next broadcast (10 seconds to avoid rate limits)
+        await asyncio.sleep(10)
 
 @app.on_event("startup")
 async def startup_event():

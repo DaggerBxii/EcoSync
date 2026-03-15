@@ -108,8 +108,7 @@ class EcoChatBot:
                 model=self.model_name,
                 contents=prompt,
                 config=types.GenerateContentConfig(
-                    temperature=0.7,
-                    max_output_tokens=500
+                    temperature=0.7
                 )
             )
             return response.text

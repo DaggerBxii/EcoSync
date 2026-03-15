@@ -164,9 +164,7 @@ class EcoBrain:
             model=self.model_name,
             contents=prompt,
             config=types.GenerateContentConfig(
-                temperature=0.7,
-                max_output_tokens=800,
-                response_mime_type="application/json"
+                temperature=0.7
             )
         )
 

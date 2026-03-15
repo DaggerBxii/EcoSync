@@ -127,7 +127,7 @@ export default function EcoSyncWebSocket() {
           <div className="grid grid-cols-2 gap-4">
             <div className="bg-gray-50 dark:bg-gray-700/50 p-4 rounded-lg">
               <div className="text-sm text-gray-500 dark:text-gray-400">Power Usage</div>
-              <div className="text-2xl font-bold text-ecosync-green">{data.metrics.watts}W</div>
+              <div className="text-2xl font-bold text-ecosync-green">{data.metrics.watts}kW</div>
             </div>
             <div className="bg-gray-50 dark:bg-gray-700/50 p-4 rounded-lg">
               <div className="text-sm text-gray-500 dark:text-gray-400">Occupancy</div>
