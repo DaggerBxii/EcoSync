@@ -1,148 +1,318 @@
 """
-AI Module for EcoSync - The Brain
-Provides ML-based predictions and insights for the EcoSync system.
+EcoSync AI Module - The Brain
+Uses Google Gemini AI for intelligent energy optimization predictions and insights.
 """
 
+import os
+import json
 import random
-from datetime import datetime, timedelta
-from typing import Dict, Any, Optional, List, Tuple
+from datetime import datetime
+from typing import Dict, Any, Optional, List
 from pathlib import Path
-import numpy as np
-import joblib
 
-# Set up paths
-BASE_DIR = Path(__file__).parent
-MODELS_DIR = BASE_DIR.parent / "models"
+# Load environment variables from .env file
+from dotenv import load_dotenv
+load_dotenv()
+
+try:
+    from google import genai
+    from google.genai import types
+    GEMINI_AVAILABLE = True
+except ImportError:
+    GEMINI_AVAILABLE = False
+    print("Warning: google-genai not installed. Using fallback mode.")
 
 
 class EcoBrain:
     """
-    AI module that provides predictions and insights for the EcoSync system.
-    Uses trained ML models for occupancy prediction, energy estimation, and anomaly detection.
+    AI module for EcoSync energy optimization.
+    Uses Google Gemini for intelligent predictions and insights.
     """
-
-    def __init__(self, use_trained_models: bool = True):
-        """
-        Initialize the AI models.
+    
+    def __init__(self, use_gemini: bool = True):
+        """Initialize the AI module."""
+        self.client = None
+        self.model_name = "gemini-2.5-flash-lite"  # Updated model according to guidelines
+        self.using_fallback = True
         
-        Args:
-            use_trained_models: If True, load pre-trained models from disk.
-                               If False or if models not found, use fallback logic.
-        """
-        self.use_trained_models = use_trained_models
-        self.occupancy_model = None
-        self.watts_model = None
-        self.anomaly_model = None
-        self.scaler = None
-        self.feature_engineer = None
-        
-        # Fallback flag
-        self.using_fallback = False
-        
-        # Historical data cache for rolling averages
+        # Historical data for context
         self._historical_occupancy: List[float] = []
         self._historical_watts: List[float] = []
+        self._historical_anomalies: List[Dict] = []
+        
+        # Configuration
         self._cache_max_size = 168  # 1 week of hourly data
         
-        # Load models if requested
-        if use_trained_models:
-            self._load_models()
-
-    def _load_models(self) -> bool:
-        """Load trained models from disk."""
+        if use_gemini:
+            self._initialize_gemini()
+    
+    def _initialize_gemini(self) -> bool:
+        """Initialize the Gemini client."""
         try:
-            model_files = [
-                "occupancy_model.joblib",
-                "watts_model.joblib", 
-                "anomaly_model.joblib",
-                "scaler.joblib",
-                "feature_engineer.joblib"
-            ]
-            
-            for model_file in model_files:
-                model_path = MODELS_DIR / model_file
-                if not model_path.exists():
-                    print(f"EcoBrain: Model file not found: {model_path}")
-                    self.using_fallback = True
-                    return False
-            
-            self.occupancy_model = joblib.load(MODELS_DIR / "occupancy_model.joblib")
-            self.watts_model = joblib.load(MODELS_DIR / "watts_model.joblib")
-            self.anomaly_model = joblib.load(MODELS_DIR / "anomaly_model.joblib")
-            self.scaler = joblib.load(MODELS_DIR / "scaler.joblib")
-            self.feature_engineer = joblib.load(MODELS_DIR / "feature_engineer.joblib")
-            
-            print("EcoBrain: Loaded trained ML models successfully.")
+            api_key = os.environ.get("GEMINI_API_KEY")
+            if not api_key:
+                print("EcoBrain: GEMINI_API_KEY not found in environment.")
+                print("EcoBrain: Set GEMINI_API_KEY environment variable or using fallback mode.")
+                return False
+
+            if not GEMINI_AVAILABLE:
+                print("EcoBrain: google-genai package not installed.")
+                print("EcoBrain: Install with: pip install google-genai")
+                return False
+
+            self.client = genai.Client(api_key=api_key)
+            self.using_fallback = False
+            print("EcoBrain: Gemini AI initialized successfully.")
             return True
-            
+
         except Exception as e:
-            print(f"EcoBrain: Error loading models: {e}")
-            print("EcoBrain: Falling back to rule-based predictions.")
+            print(f"EcoBrain: Error initializing Gemini: {e}")
             self.using_fallback = True
             return False
-
-    def get_decision(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
+    
+    def get_decision(self, input_data: Dict[str, Any] = None) -> Dict[str, Any]:
         """
-        Process input data and return a decision/prediction following the Sync Contract.
-
-        Args:
-            input_data: Dictionary containing input data for the AI.
-                       Expected keys: hour_of_day, day_of_week (optional),
-                       temperature (optional), humidity (optional)
-
-        Returns:
-            Dictionary with the structure defined in the Sync Contract
-        """
-        # Extract input features
-        timestamp = datetime.now()
-        hour_of_day = input_data.get('hour_of_day', timestamp.hour)
-        day_of_week = input_data.get('day_of_week', timestamp.weekday())
-        temperature = input_data.get('temperature')
-        humidity = input_data.get('humidity')
+        Generate a prediction following the Sync Contract.
         
-        # Create timestamp for feature extraction
-        pred_timestamp = timestamp.replace(hour=hour_of_day)
+        Args:
+            input_data: Optional input data (hour_of_day, temperature, humidity, etc.)
+        
+        Returns:
+            Dictionary with timestamp, system_status, scale_level, metrics,
+            ai_insight, is_anomaly, confidence_score
+        """
+        timestamp = datetime.now()
+        
+        # Extract input parameters
+        hour_of_day = input_data.get("hour_of_day", timestamp.hour) if input_data else timestamp.hour
+        temperature = input_data.get("temperature") if input_data else None
+        humidity = input_data.get("humidity") if input_data else None
+        
+        if self.using_fallback or self.client is None:
+            return self._fallback_decision(timestamp, hour_of_day)
+        
+        try:
+            # Get AI prediction from Gemini
+            prediction = self._get_gemini_prediction(timestamp, hour_of_day, temperature, humidity)
+            return prediction
+        except Exception as e:
+            print(f"EcoBrain: Error getting Gemini prediction: {e}")
+            return self._fallback_decision(timestamp, hour_of_day)
+    
+    def _get_gemini_prediction(self, timestamp: datetime, hour_of_day: int,
+                               temperature: Optional[float] = None,
+                               humidity: Optional[float] = None) -> Dict[str, Any]:
+        """Get prediction from Gemini AI."""
+        
+        # Build context from historical data
+        historical_context = self._build_historical_context()
+        
+        # Build the prompt
+        prompt = self._build_prediction_prompt(timestamp, hour_of_day, temperature, humidity, historical_context)
+        
+        # Call Gemini API
+        response = self.client.models.generate_content(
+            model=self.model_name,
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                temperature=0.7,
+                max_output_tokens=500,
+                response_mime_type="application/json"
+            )
+        )
+        
+        # Parse the response
+        result = self._parse_gemini_response(response.text, timestamp)
+        
+        # Update historical data
+        self._update_history(result)
+        
+        return result
+    
+    def _build_prediction_prompt(self, timestamp: datetime, hour_of_day: int,
+                                  temperature: Optional[float],
+                                  humidity: Optional[float],
+                                  historical_context: str) -> str:
+        """Build the prompt for Gemini."""
 
-        # Get predictions
-        if self.using_fallback or self.occupancy_model is None:
-            occupancy_prediction, occ_confidence = self._predict_occupancy_fallback(hour_of_day, day_of_week)
-            watts_prediction, watts_confidence = self._predict_watts_fallback(occupancy_prediction)
+        current_time = timestamp.strftime("%Y-%m-%d %H:%M:%S")
+        day_of_week = timestamp.strftime("%A")
+
+        prompt = f"""You are EcoSync, an AI energy management system for a smart building. Analyze the current situation and provide energy optimization recommendations.
+
+CURRENT CONTEXT:
+- Current Time: {current_time}
+- Hour of Day: {hour_of_day}
+- Day of Week: {day_of_week}
+- Temperature: {temperature if temperature else 'Unknown (assume 22°C)'}
+- Humidity: {humidity if humidity else 'Unknown (assume 50%)'}
+
+{historical_context}
+
+TASK:
+Analyze the building's energy state and provide predictions in JSON format.
+
+RESPONSE FORMAT (JSON only, no markdown):
+{{
+    "occupancy": <integer 0-15>,
+    "watts": <float 50-200>,
+    "is_anomaly": <boolean>,
+    "anomaly_type": <string or null>,
+    "system_status": "<Eco Mode|Scaling Down|Active|Alert>",
+    "scale_level": <float 0.1-1.0>,
+    "ai_insight": "<detailed explanation of the prediction>",
+    "confidence_score": <float 0.5-1.0>,
+    "recommendations": ["<recommendation 1>", "<recommendation 2>"],
+    "unnecessary_usage_detected": <boolean>,
+    "optimization_opportunities": ["<opportunity 1>", "<opportunity 2>"]
+}}
+
+LIVE FEED ANALYSIS RULES:
+1. Compare current watts to expected watts based on occupancy
+2. Flag unnecessary usage when watts are significantly higher than expected for current occupancy
+3. Identify optimization opportunities when energy efficiency could be improved
+4. Consider time-of-day patterns and suggest adjustments
+
+RESPONSE RULES:
+1. Occupancy should be 0-2 during night hours (22:00-06:00)
+2. Occupancy should be higher during work hours (09:00-17:00) on weekdays
+3. Weekends have lower occupancy
+4. Watts should correlate with occupancy (base ~50W + occupancy * ~10W)
+5. is_anomaly should be true if occupancy=0 and watts>100
+6. unnecessary_usage_detected should be true when watts exceed expected levels for current occupancy
+7. scale_level = occupancy / 10 (min 0.1, max 1.0)
+8. ai_insight should be human-readable and explain the reasoning
+9. confidence_score should reflect prediction certainty
+10. optimization_opportunities should list specific ways to reduce energy waste
+
+Respond with ONLY the JSON object, no additional text."""
+
+        return prompt
+    
+    def _build_historical_context(self) -> str:
+        """Build context from historical data."""
+        if not self._historical_occupancy:
+            return "HISTORICAL DATA: No historical data available yet."
+        
+        avg_occ = sum(self._historical_occupancy[-24:]) / min(len(self._historical_occupancy), 24)
+        avg_watts = sum(self._historical_watts[-24:]) / min(len(self._historical_watts), 24)
+        
+        recent_anomalies = [a for a in self._historical_anomalies[-5:]]
+        
+        context = f"""HISTORICAL DATA (last 24 hours):
+- Average Occupancy: {avg_occ:.1f} people
+- Average Power: {avg_watts:.1f}W
+- Recent Anomalies: {len(recent_anomalies)}"""
+        
+        if recent_anomalies:
+            context += f"\n- Last Anomaly: {recent_anomalies[-1].get('description', 'Unknown')}"
+        
+        return context
+    
+    def _parse_gemini_response(self, response_text: str, timestamp: datetime) -> Dict[str, Any]:
+        """Parse the Gemini response into the Sync Contract format."""
+        try:
+            # Clean the response (remove markdown if present)
+            clean_response = response_text.strip()
+            if clean_response.startswith("```json"):
+                clean_response = clean_response[7:]
+            if clean_response.startswith("```"):
+                clean_response = clean_response[3:]
+            if clean_response.endswith("```"):
+                clean_response = clean_response[:-3]
+            clean_response = clean_response.strip()
+
+            # Parse JSON
+            data = json.loads(clean_response)
+
+            # Extract values with defaults
+            occupancy = int(data.get("occupancy", 5))
+            watts = float(data.get("watts", 100))
+            is_anomaly = bool(data.get("is_anomaly", False))
+            system_status = data.get("system_status", "Active")
+            scale_level = float(data.get("scale_level", 0.5))
+            ai_insight = data.get("ai_insight", "AI prediction generated.")
+            confidence = float(data.get("confidence_score", 0.8))
+            unnecessary_usage_detected = bool(data.get("unnecessary_usage_detected", False))
+            optimization_opportunities = data.get("optimization_opportunities", [])
+
+            # Validate and constrain values
+            occupancy = max(0, min(15, occupancy))
+            watts = max(50, min(200, watts))
+            scale_level = max(0.1, min(1.0, scale_level))
+            confidence = max(0.5, min(1.0, confidence))
+
+            # Calculate carbon saved
+            baseline_watts = 150.0
+            carbon_saved = max(0, (baseline_watts - watts) * 0.0004)
+
+            # Build the Sync Contract response
+            result = {
+                "timestamp": datetime.utcnow().isoformat() + "Z",
+                "system_status": system_status,
+                "scale_level": round(scale_level, 2),
+                "metrics": {
+                    "watts": round(watts, 2),
+                    "occupancy": occupancy,
+                    "carbon_saved": round(carbon_saved, 3)
+                },
+                "ai_insight": ai_insight,
+                "is_anomaly": is_anomaly,
+                "confidence_score": round(confidence, 3),
+                "unnecessary_usage_detected": unnecessary_usage_detected,
+                "optimization_opportunities": optimization_opportunities
+            }
+
+            # Log anomaly if detected
+            if is_anomaly or unnecessary_usage_detected:
+                self._historical_anomalies.append({
+                    "timestamp": result["timestamp"],
+                    "description": ai_insight,
+                    "watts": watts,
+                    "occupancy": occupancy,
+                    "unnecessary_usage_detected": unnecessary_usage_detected
+                })
+
+            return result
+
+        except json.JSONDecodeError as e:
+            print(f"EcoBrain: Error parsing Gemini response: {e}")
+            print(f"EcoBrain: Response was: {response_text[:200]}...")
+            return self._fallback_decision(timestamp, timestamp.hour)
+    
+    def _fallback_decision(self, timestamp: datetime, hour_of_day: int) -> Dict[str, Any]:
+        """Fallback decision when Gemini is not available."""
+
+        # Rule-based prediction
+        is_weekend = timestamp.weekday() >= 5
+
+        if hour_of_day < 6 or hour_of_day > 22:
+            occupancy = random.randint(0, 2)
+        elif 6 <= hour_of_day <= 9:
+            occupancy = random.randint(6, 10)
+        elif 10 <= hour_of_day <= 17:
+            occupancy = random.randint(4, 8)
         else:
-            occupancy_prediction, occ_confidence = self._predict_occupancy_ml(
-                pred_timestamp, temperature, humidity
-            )
-            watts_prediction, watts_confidence = self._predict_watts_ml(
-                pred_timestamp, occupancy_prediction, temperature, humidity
-            )
+            occupancy = random.randint(2, 6)
 
-        # Update historical cache
-        self._update_historical_cache(occupancy_prediction, watts_prediction)
+        if is_weekend:
+            occupancy = max(0, occupancy - 3)
+
+        watts = 50.0 + occupancy * random.uniform(8.0, 15.0)
 
         # Check for anomaly
-        is_anomaly, anomaly_confidence = self._check_anomaly(
-            occupancy_prediction, 
-            watts_prediction,
-            temperature,
-            humidity
-        )
+        is_anomaly = occupancy == 0 and watts > 100
+        
+        # Check for unnecessary usage
+        expected_watts = 50.0 + occupancy * 10.0
+        unnecessary_usage_detected = watts > expected_watts * 1.3  # 30% higher than expected
 
-        # Calculate overall confidence score
-        confidence_score = (occ_confidence + watts_confidence + (1.0 if not is_anomaly else 0.5)) / 3.0
+        # Calculate metrics
+        scale_level = max(0.1, min(1.0, occupancy / 10))
+        baseline_watts = 150.0
+        carbon_saved = max(0, (baseline_watts - watts) * 0.0004)
 
-        # Generate AI insight using NLP templates
-        ai_insight = self._generate_insight(
-            occupancy_prediction,
-            watts_prediction,
-            is_anomaly,
-            hour_of_day,
-            confidence_score
-        )
-
-        # Calculate scale level based on occupancy (lower occupancy = lower scale)
-        max_occupancy = 10
-        scale_level = max(0.1, min(1.0, occupancy_prediction / max_occupancy))
-
-        # Determine system status
+        # Determine status
         if is_anomaly:
             system_status = "Alert"
         elif scale_level < 0.3:
@@ -152,242 +322,177 @@ class EcoBrain:
         else:
             system_status = "Active"
 
-        # Calculate carbon saved (based on baseline vs actual)
-        baseline_watts = 150.0
-        carbon_factor = 0.0004
-        carbon_saved = max(0, (baseline_watts - watts_prediction) * carbon_factor)
+        # Generate insight
+        ai_insight = self._generate_fallback_insight(occupancy, watts, is_anomaly)
+        
+        # Generate optimization opportunities
+        optimization_opportunities = []
+        if unnecessary_usage_detected:
+            optimization_opportunities.append(f"Energy usage ({watts:.1f}W) is significantly higher than expected for current occupancy ({occupancy} people)")
+            optimization_opportunities.append("Consider investigating equipment that may be consuming excess energy")
+        if occupancy == 0 and watts > 80:
+            optimization_opportunities.append("Zero occupancy with high energy usage detected - consider activating deep eco-mode")
 
-        # Return the Sync Contract structure
-        return {
+        result = {
             "timestamp": datetime.utcnow().isoformat() + "Z",
             "system_status": system_status,
             "scale_level": round(scale_level, 2),
             "metrics": {
-                "watts": round(watts_prediction, 2),
-                "occupancy": int(round(occupancy_prediction)),
+                "watts": round(watts, 2),
+                "occupancy": occupancy,
                 "carbon_saved": round(carbon_saved, 3)
             },
             "ai_insight": ai_insight,
             "is_anomaly": is_anomaly,
-            "confidence_score": round(confidence_score, 3)
+            "confidence_score": 0.75,
+            "unnecessary_usage_detected": unnecessary_usage_detected,
+            "optimization_opportunities": optimization_opportunities
         }
 
-    def _predict_occupancy_ml(
-        self, 
-        timestamp: datetime, 
-        temperature: Optional[float] = None,
-        humidity: Optional[float] = None
-    ) -> Tuple[float, float]:
-        """ML-based occupancy prediction with confidence score."""
-        # Get historical averages
-        hist_avg_occ = np.mean(self._historical_occupancy) if self._historical_occupancy else 5.0
-        hist_avg_watts = np.mean(self._historical_watts) if self._historical_watts else 100.0
+        # Update history
+        self._update_history(result)
 
-        # Create feature vector
-        feature_vector = self.feature_engineer.create_feature_vector(
-            timestamp=timestamp,
-            historical_avg_occupancy=hist_avg_occ,
-            historical_avg_watts=hist_avg_watts,
-            temperature=temperature,
-            humidity=humidity
-        )
-
-        # Scale features
-        feature_vector_scaled = self.scaler.transform([feature_vector])
-
-        # Get prediction from model
-        prediction = self.occupancy_model.predict(feature_vector_scaled)[0]
-
-        # Get confidence from prediction variance (using multiple trees)
-        if hasattr(self.occupancy_model, 'estimators_'):
-            tree_predictions = np.array([
-                tree.predict(feature_vector_scaled)[0] 
-                for tree in self.occupancy_model.estimators_
-            ])
-            std_dev = np.std(tree_predictions)
-            confidence = max(0.5, min(1.0, 1.0 - (std_dev / 5.0)))
-        else:
-            confidence = 0.8
-
-        return max(0, prediction), confidence
-
-    def _predict_watts_ml(
-        self,
-        timestamp: datetime,
-        occupancy: float,
-        temperature: Optional[float] = None,
-        humidity: Optional[float] = None
-    ) -> Tuple[float, float]:
-        """ML-based watts prediction with confidence score."""
-        hist_avg_occ = np.mean(self._historical_occupancy) if self._historical_occupancy else 5.0
-        hist_avg_watts = np.mean(self._historical_watts) if self._historical_watts else 100.0
-
-        feature_vector = self.feature_engineer.create_feature_vector(
-            timestamp=timestamp,
-            historical_avg_occupancy=hist_avg_occ,
-            historical_avg_watts=hist_avg_watts,
-            temperature=temperature,
-            humidity=humidity
-        )
-
-        feature_vector_scaled = self.scaler.transform([feature_vector])
-
-        prediction = self.watts_model.predict(feature_vector_scaled)[0]
-
-        # Get confidence from prediction variance
-        if hasattr(self.watts_model, 'estimators_'):
-            tree_predictions = np.array([
-                tree.predict(feature_vector_scaled)[0] 
-                for tree in self.watts_model.estimators_
-            ])
-            std_dev = np.std(tree_predictions)
-            confidence = max(0.5, min(1.0, 1.0 - (std_dev / 50.0)))
-        else:
-            confidence = 0.8
-
-        return max(0, prediction), confidence
-
-    def _check_anomaly(
-        self,
-        occupancy: float,
-        watts: float,
-        temperature: Optional[float] = None,
-        humidity: Optional[float] = None
-    ) -> Tuple[bool, float]:
-        """Anomaly detection using Isolation Forest with rule-based fallback."""
-        if self.using_fallback or self.anomaly_model is None:
-            is_anomaly = occupancy == 0 and watts > 100
-            if is_anomaly:
-                confidence = min(1.0, 0.5 + (watts - 100) / 200)
-            else:
-                confidence = 0.9
-            return is_anomaly, confidence
-
-        try:
-            timestamp = datetime.now()
-            hist_avg_occ = np.mean(self._historical_occupancy) if self._historical_occupancy else 5.0
-            hist_avg_watts = np.mean(self._historical_watts) if self._historical_watts else 100.0
-
-            feature_vector = self.feature_engineer.create_feature_vector(
-                timestamp=timestamp,
-                historical_avg_occupancy=hist_avg_occ,
-                historical_avg_watts=hist_avg_watts,
-                temperature=temperature,
-                humidity=humidity
-            )
-
-            feature_vector_scaled = self.scaler.transform([feature_vector])
-
-            prediction = self.anomaly_model.predict(feature_vector_scaled)[0]
-            is_anomaly = prediction == -1
-
-            anomaly_score = self.anomaly_model.decision_function(feature_vector_scaled)[0]
-            confidence = 1.0 / (1.0 + np.exp(-anomaly_score * 5))
-
-            return is_anomaly, confidence
-
-        except Exception as e:
-            print(f"EcoBrain: Anomaly detection error: {e}")
-            return occupancy == 0 and watts > 100, 0.7
-
-    def _generate_insight(
-        self,
-        occupancy: float,
-        watts: float,
-        is_anomaly: bool,
-        hour: int,
-        confidence: float
-    ) -> str:
-        """Generate human-readable AI insight using NLP templates."""
+        return result
+    
+    def _generate_fallback_insight(self, occupancy: int, watts: float, is_anomaly: bool) -> str:
+        """Generate a fallback insight when Gemini is not available."""
         if is_anomaly:
-            templates = [
-                f"⚠️ Anomaly detected: High energy usage ({watts:.0f}W) with zero occupancy. Investigate immediately.",
-                f"⚠️ Alert: Unusual power consumption detected. No occupants present but drawing {watts:.0f}W.",
-                f"⚠️ Warning: Potential equipment malfunction. Zero occupancy with {watts:.0f}W consumption."
-            ]
-            return random.choice(templates)
-
+            return f"⚠️ Anomaly detected: High energy usage ({watts:.0f}W) with zero occupancy. Investigate immediately."
+        
         if occupancy == 0:
-            templates = [
+            return random.choice([
                 "Deep Eco-Mode: No human load detected. Building is unoccupied.",
                 "Maximum efficiency: Zero occupancy. All non-essential systems scaled down.",
                 "Energy saving mode: Building vacant. Minimal power consumption active."
-            ]
-            return random.choice(templates)
-
+            ])
         elif occupancy < 3:
-            efficiency = 1.0 - (watts / 200.0)
-            templates = [
-                f"Low occupancy period ({int(occupancy)} people). Reducing power to {watts:.0f}W.",
-                f"Minimal load detected. Operating at {efficiency*100:.0f}% efficiency.",
-                f"Few occupants present. Optimized energy distribution active."
-            ]
-            return random.choice(templates)
-
+            return f"Low occupancy ({occupancy} people). Reducing power to {watts:.0f}W for efficiency."
         elif occupancy < 7:
-            templates = [
-                f"Moderate occupancy ({int(occupancy)} people). Normal operations at {watts:.0f}W.",
-                f"Standard load period. Energy distribution optimized for {int(occupancy)} occupants.",
-                f"Normal operations with efficient energy allocation."
-            ]
-            return random.choice(templates)
-
+            return f"Moderate occupancy ({occupancy} people). Normal operations at {watts:.0f}W."
         else:
-            templates = [
-                f"High occupancy ({int(occupancy)} people). Full capacity operations at {watts:.0f}W.",
-                f"Peak load period. All systems active to support {int(occupancy)} occupants.",
-                f"Maximum capacity operations. Energy prioritized for occupant comfort."
-            ]
-            return random.choice(templates)
-
-    def _predict_occupancy_fallback(
-        self, 
-        hour_of_day: int, 
-        day_of_week: int
-    ) -> Tuple[int, float]:
-        """Fallback occupancy prediction using rule-based logic."""
-        if 6 <= hour_of_day <= 9:
-            prediction = random.randint(6, 10)
-            confidence = 0.7
-        elif 10 <= hour_of_day <= 17:
-            prediction = random.randint(4, 8)
-            confidence = 0.75
-        elif 18 <= hour_of_day <= 21:
-            prediction = random.randint(3, 7)
-            confidence = 0.7
-        else:
-            prediction = random.randint(0, 2)
-            confidence = 0.85
-
-        if day_of_week >= 5:
-            prediction = max(0, prediction - 2)
-            confidence -= 0.1
-
-        return prediction, max(0.5, confidence)
-
-    def _predict_watts_fallback(self, occupancy: int) -> Tuple[float, float]:
-        """Fallback watts prediction using rule-based logic."""
-        base_wattage = 50.0
-        prediction = base_wattage + (occupancy * random.uniform(8.0, 15.0))
-        confidence = 0.75
-        return prediction, confidence
-
-    def _update_historical_cache(self, occupancy: float, watts: float):
-        """Update the historical data cache for rolling averages."""
-        self._historical_occupancy.append(occupancy)
-        self._historical_watts.append(watts)
-
+            return f"High occupancy ({occupancy} people). Full capacity operations at {watts:.0f}W."
+    
+    def _update_history(self, result: Dict[str, Any]):
+        """Update historical data with new prediction."""
+        self._historical_occupancy.append(result["metrics"]["occupancy"])
+        self._historical_watts.append(result["metrics"]["watts"])
+        
         if len(self._historical_occupancy) > self._cache_max_size:
             self._historical_occupancy.pop(0)
             self._historical_watts.pop(0)
-
+        
+        if len(self._historical_anomalies) > 100:
+            self._historical_anomalies.pop(0)
+    
     def get_model_info(self) -> Dict[str, Any]:
-        """Get information about loaded models."""
+        """Get AI module status information."""
         return {
-            "using_trained_models": not self.using_fallback,
-            "occupancy_model_loaded": self.occupancy_model is not None,
-            "watts_model_loaded": self.watts_model is not None,
-            "anomaly_model_loaded": self.anomaly_model is not None,
+            "using_gemini": not self.using_fallback,
+            "gemini_available": GEMINI_AVAILABLE,
+            "model_name": self.model_name if not self.using_fallback else "fallback",
+            "client_initialized": self.client is not None,
             "historical_samples": len(self._historical_occupancy),
-            "models_directory": str(MODELS_DIR)
+            "anomalies_detected": len(self._historical_anomalies)
         }
+    
+    def analyze_anomaly(self, anomaly_data: Dict[str, Any]) -> str:
+        """Get detailed analysis of an anomaly from Gemini."""
+        if self.using_fallback or self.client is None:
+            return "Anomaly analysis unavailable - Gemini not initialized."
+        
+        try:
+            prompt = f"""Analyze this building energy anomaly and provide recommendations:
+
+ANOMALY DATA:
+- Timestamp: {anomaly_data.get('timestamp', 'Unknown')}
+- Power Usage: {anomaly_data.get('watts', 'Unknown')}W
+- Occupancy: {anomaly_data.get('occupancy', 'Unknown')}
+- Description: {anomaly_data.get('description', 'Unknown')}
+
+Provide:
+1. Likely cause of the anomaly
+2. Potential risks
+3. Recommended actions
+4. Priority level (Low/Medium/High/Critical)
+
+Keep the response concise and actionable."""
+            
+            response = self.client.models.generate_content(
+                model=self.model_name,
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    temperature=0.5,
+                    max_output_tokens=300
+                )
+            )
+            
+            return response.text
+            
+        except Exception as e:
+            return f"Error analyzing anomaly: {e}"
+    
+    def get_energy_recommendations(self, hours_ahead: int = 24) -> List[Dict[str, Any]]:
+        """Get energy optimization recommendations for the next N hours."""
+        if self.using_fallback or self.client is None:
+            return self._get_fallback_recommendations(hours_ahead)
+        
+        try:
+            historical_context = self._build_historical_context()
+            
+            prompt = f"""Based on current building data, provide energy optimization recommendations for the next {hours_ahead} hours.
+
+{historical_context}
+
+Provide 3-5 specific, actionable recommendations in JSON format:
+{{
+    "recommendations": [
+        {{
+            "time": "<hour or time range>",
+            "action": "<specific action>",
+            "expected_savings": "<estimated energy savings>",
+            "priority": "<High/Medium/Low>"
+        }}
+    ]
+}}
+
+Respond with ONLY the JSON object."""
+            
+            response = self.client.models.generate_content(
+                model=self.model_name,
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    temperature=0.6,
+                    max_output_tokens=500,
+                    response_mime_type="application/json"
+                )
+            )
+            
+            data = json.loads(response.text)
+            return data.get("recommendations", [])
+            
+        except Exception as e:
+            print(f"EcoBrain: Error getting recommendations: {e}")
+            return self._get_fallback_recommendations(hours_ahead)
+    
+    def _get_fallback_recommendations(self, hours_ahead: int) -> List[Dict[str, Any]]:
+        """Get fallback recommendations."""
+        return [
+            {
+                "time": "Night hours (22:00-06:00)",
+                "action": "Activate deep eco-mode and reduce HVAC to minimum",
+                "expected_savings": "30-40% energy reduction",
+                "priority": "High"
+            },
+            {
+                "time": "Morning rush (06:00-09:00)",
+                "action": "Pre-cool/heat building before occupancy peak",
+                "expected_savings": "15-20% HVAC efficiency",
+                "priority": "Medium"
+            },
+            {
+                "time": "Work hours (09:00-17:00)",
+                "action": "Optimize lighting based on natural daylight",
+                "expected_savings": "10-15% lighting energy",
+                "priority": "Low"
+            }
+        ]

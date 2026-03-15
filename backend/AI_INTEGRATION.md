@@ -2,7 +2,7 @@
 
 ## Overview
 
-EcoSync uses machine learning to predict building occupancy, energy consumption, and detect anomalies in real-time. The AI module (`EcoBrain`) serves predictions to the frontend via WebSocket connections, enabling live energy optimization visualization.
+EcoSync uses Google Gemini AI for intelligent energy optimization predictions and insights. The AI module (`EcoBrain`) serves real-time predictions to the frontend via WebSocket connections, enabling live energy optimization visualization.
 
 ---
 
@@ -13,120 +13,151 @@ EcoSync uses machine learning to predict building occupancy, energy consumption,
 │                      EcoSync AI Pipeline                        │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
-│  Input Features → Feature Engineering → ML Models → Insights   │
+│  Input Data → Context Building → Gemini API → Structured Output│
 │                                                                 │
-│  • Hour of day    • Cyclical encoding   • Occupancy     • NLP  │
-│  • Day of week    • Rolling averages    • Watts         • UI   │
-│  • Season         • Historical baselines• Anomaly       • Logs │
+│  • Time features    • Historical context   • Predictions       │
+│  • Environment      • Anomaly history      • Insights          │
+│  • Building state                          • Recommendations   │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Models
+## AI Module: EcoBrain
 
-### 1. Occupancy Predictor (RandomForestRegressor)
-
-**Purpose:** Predict number of occupants based on time and historical patterns.
-
-**Input Features (19 total):**
-- `hour_sin`, `hour_cos` - Cyclical hour encoding
-- `dow_sin`, `dow_cos` - Day of week cyclical encoding
-- `doy_sin`, `doy_cos` - Day of year (seasonal) encoding
-- `is_weekend`, `is_night`, `is_morning_rush`, `is_work_hours`, `is_evening` - Time period flags
-- `season_*` - One-hot encoded season (spring/summer/fall/winter)
-- `historical_avg_occupancy` - Rolling average occupancy
-- `historical_avg_watts` - Rolling average energy consumption
-- `temperature`, `humidity` - Environmental factors (optional)
-
-**Output:** Predicted occupancy (0-15) + confidence score
-
-**Performance Metrics:**
-- MAE (Mean Absolute Error)
-- RMSE (Root Mean Square Error)
-- R² Score
-
----
-
-### 2. Energy Predictor (GradientBoostingRegressor)
-
-**Purpose:** Predict energy consumption (watts) based on occupancy and time features.
-
-**Input Features:** Same 19 features as occupancy model
-
-**Output:** Predicted watts + confidence score
-
----
-
-### 3. Anomaly Detector (Isolation Forest)
-
-**Purpose:** Detect unusual patterns (e.g., high energy with zero occupancy).
-
-**Input Features:** Same 19 features
-
-**Output:** Anomaly flag (-1 = anomaly, 1 = normal) + anomaly score
-
-**Anomaly Types:**
-- **Equipment malfunction** - High watts, zero occupancy
-- **Unauthorized usage** - After-hours activity
-- **Sensor anomaly** - Impossible values or sudden spikes
-
----
-
-## Feature Engineering
-
-### Cyclical Encoding
-
-Time features use sine/cosine transformation to capture cyclical nature:
+### Initialization
 
 ```python
-hour_sin = sin(2π × hour / 24)
-hour_cos = cos(2π × hour / 24)
+from ai_module import EcoBrain
+
+# Initialize with Gemini (requires GEMINI_API_KEY environment variable)
+ai = EcoBrain(use_gemini=True)
+
+# Or use fallback mode (rule-based predictions)
+ai = EcoBrain(use_gemini=False)
 ```
 
-This ensures 23:00 and 00:00 are close in feature space (not far apart as raw values).
+### Configuration
 
-### Rolling Averages
+Set the `GEMINI_API_KEY` environment variable:
 
-Historical averages provide context:
-- 1-hour rolling average
-- 6-hour rolling average
-- 24-hour rolling average
-- Same time-slot historical baseline
+```bash
+# Windows
+set GEMINI_API_KEY=your-api-key-here
 
----
+# Linux/Mac
+export GEMINI_API_KEY=your-api-key-here
+```
 
-## Confidence Scoring
+Or create a `.env` file in the backend directory:
 
-Each prediction includes a confidence score (0.5 - 1.0):
-
-**Calculation:**
-- For tree-based models: Based on prediction variance across estimators
-- Low variance = high confidence
-- High variance = low confidence (model uncertain)
-
-**Usage:**
-- Displayed in UI for transparency
-- Low confidence triggers fallback to rule-based logic
-- Logged for performance monitoring
+```
+GEMINI_API_KEY=your-api-key-here
+```
 
 ---
 
-## AI Insight Generation
+## API Methods
 
-Uses template-based NLP to generate human-readable explanations:
+### `get_decision(input_data)`
 
+Get a prediction following the Sync Contract format.
+
+**Input:**
 ```python
-# Example templates
-{
-    "anomaly": "⚠️ Anomaly detected: High energy usage ({watts}W) with zero occupancy.",
-    "eco_mode": "Deep Eco-Mode: No human load detected. Building is unoccupied.",
-    "low_occupancy": "Low occupancy period ({occ} people). Reducing power to {watts}W.",
-    "normal": "Moderate occupancy ({occ} people). Normal operations at {watts}W.",
-    "high_occupancy": "High occupancy ({occ} people). Full capacity operations."
+input_data = {
+    "hour_of_day": 14,
+    "temperature": 22.5,  # optional
+    "humidity": 50        # optional
 }
 ```
+
+**Output (Sync Contract):**
+```json
+{
+  "timestamp": "2026-03-15T14:30:00Z",
+  "system_status": "Active",
+  "scale_level": 0.65,
+  "metrics": {
+    "watts": 115.5,
+    "occupancy": 6,
+    "carbon_saved": 0.014
+  },
+  "ai_insight": "Moderate occupancy (6 people). Normal operations at 116W.",
+  "is_anomaly": false,
+  "confidence_score": 0.85
+}
+```
+
+### `get_model_info()`
+
+Get AI module status:
+
+```python
+info = ai.get_model_info()
+# Returns:
+{
+    "using_gemini": True,
+    "gemini_available": True,
+    "model_name": "gemini-2.0-flash",
+    "client_initialized": True,
+    "historical_samples": 42,
+    "anomalies_detected": 2
+}
+```
+
+### `analyze_anomaly(anomaly_data)`
+
+Get detailed analysis of an anomaly:
+
+```python
+analysis = ai.analyze_anomaly({
+    "timestamp": "2026-03-15T14:30:00Z",
+    "watts": 150,
+    "occupancy": 0,
+    "description": "High energy with zero occupancy"
+})
+```
+
+### `get_energy_recommendations(hours_ahead)`
+
+Get optimization recommendations:
+
+```python
+recommendations = ai.get_energy_recommendations(hours_ahead=24)
+# Returns list of recommendations with time, action, expected_savings, priority
+```
+
+---
+
+## Model: Gemini 2.0 Flash
+
+The AI module uses Google's Gemini 2.0 Flash model for:
+- Fast, efficient predictions
+- Natural language insights
+- Anomaly detection with explanations
+- Energy optimization recommendations
+
+### Prompt Engineering
+
+The module uses structured prompts that:
+1. Provide current context (time, environment, building state)
+2. Include historical data for pattern recognition
+3. Request JSON-formatted responses for consistency
+4. Apply energy management domain knowledge
+
+---
+
+## Fallback Mode
+
+When Gemini is unavailable, the system uses rule-based predictions:
+
+- **Night hours (22:00-06:00):** Low occupancy (0-2), minimal power
+- **Morning rush (06:00-09:00):** High occupancy (6-10), ramp up systems
+- **Work hours (09:00-17:00):** Moderate occupancy (4-8), normal operations
+- **Evening (17:00-22:00):** Decreasing occupancy (2-6), scale down
+- **Weekends:** Reduced occupancy across all periods
 
 ---
 
@@ -138,11 +169,14 @@ Real-time predictions broadcast every 2 seconds.
 ### GET `/health`
 Health check for monitoring.
 
-### GET `/metrics`
-Model performance metrics (MAE, RMSE, sample count).
-
 ### GET `/ai/info`
-AI module status (models loaded, using fallback, etc.).
+AI module status (Gemini initialized, model name, etc.).
+
+### GET `/ai/recommendations?hours_ahead=24`
+Energy optimization recommendations.
+
+### GET `/metrics`
+Performance metrics and historical data stats.
 
 ### GET `/anomalies`
 Historical anomaly events.
@@ -152,65 +186,14 @@ Comprehensive system status.
 
 ---
 
-## Sync Contract (Output Format)
-
-```json
-{
-  "timestamp": "2026-03-15T16:20:00Z",
-  "system_status": "Eco Mode",
-  "scale_level": 0.25,
-  "metrics": {
-    "watts": 105.2,
-    "occupancy": 0,
-    "carbon_saved": 0.045
-  },
-  "ai_insight": "Deep Eco-Mode: No human load detected. Building is unoccupied.",
-  "is_anomaly": false,
-  "confidence_score": 0.87
-}
-```
-
----
-
 ## Data Logging
 
 All predictions are logged to SQLite (`ecosync_data.db`):
 
 **Tables:**
 - `sensor_readings` - Raw sensor data
-- `predictions` - AI predictions with actuals (when available)
+- `predictions` - AI predictions with actuals
 - `anomalies` - Detected anomaly events
-
-**Purpose:**
-- Model retraining with real data
-- Performance tracking over time
-- Anomaly investigation and resolution
-
----
-
-## Model Training
-
-### Initial Training (Synthetic Data)
-
-```bash
-cd backend
-python src/model_trainer.py
-```
-
-This generates 10,000 synthetic samples with realistic patterns:
-- Time-based occupancy variations
-- Weekend vs weekday differences
-- Morning/evening rush patterns
-- 5% anomaly rate
-
-### Retraining with Real Data
-
-When real sensor data is available:
-
-1. Collect data via `data_logger.py`
-2. Update `model_trainer.py` to load from database
-3. Run training pipeline
-4. Models saved to `backend/models/`
 
 ---
 
@@ -219,101 +202,84 @@ When real sensor data is available:
 ```
 backend/
 ├── src/
-│   ├── ai_module.py          # EcoBrain class (main AI logic)
-│   ├── model_trainer.py      # Training pipeline
+│   ├── ai_module.py          # EcoBrain class (Gemini integration)
 │   ├── data_logger.py        # SQLite logging
 │   ├── main.py               # FastAPI application
 │   └── models.py             # Pydantic schemas
-├── models/
-│   ├── occupancy_model.joblib
-│   ├── watts_model.joblib
-│   ├── anomaly_model.joblib
-│   ├── scaler.joblib
-│   └── feature_engineer.joblib
+├── requirements.txt          # Dependencies (includes google-genai)
 └── data/
     └── ecosync_data.db
 ```
 
 ---
 
-## AI Ethics & Fair Play
+## Installation
+
+```bash
+cd backend
+pip install -r requirements.txt
+
+# Set your Gemini API key
+set GEMINI_API_KEY=your-api-key-here
+
+# Run the server
+python -m uvicorn src.main:app --host 0.0.0.0 --port 8000
+```
+
+---
+
+## AI Ethics & Transparency
 
 ### Transparency
-- Confidence scores displayed for all predictions
-- AI insights explain reasoning in plain language
-- Model performance metrics publicly accessible via `/metrics`
+- All predictions include confidence scores
+- AI insights explain the reasoning in plain language
+- Fallback mode is clearly indicated when Gemini is unavailable
 
-### Bias Mitigation
-- Models trained on diverse synthetic data covering all time periods
-- Weekend/holiday patterns explicitly encoded
-- No demographic or personal data collected
-
-### Human Oversight
-- Anomalies flagged for human investigation
-- Facility managers can override AI decisions
-- All predictions logged for audit trail
-
-### Data Privacy
+### Privacy
 - Only aggregate occupancy counts (no individual tracking)
 - No personally identifiable information stored
-- Data retention policy: 365 days (configurable)
+- Building data stays local (only sent to Gemini API for processing)
 
----
-
-## Fallback Behavior
-
-If trained models are unavailable:
-- System gracefully degrades to rule-based predictions
-- Clear logging indicates fallback mode
-- Confidence scores reflect increased uncertainty
-- Core functionality remains operational
-
----
-
-## Performance Targets
-
-| Metric | Target | Current (Synthetic) |
-|--------|--------|---------------------|
-| Occupancy MAE | < 1.5 | ~1.2 |
-| Watts MAE | < 15W | ~12W |
-| Anomaly Precision | > 0.85 | ~0.88 |
-| Anomaly Recall | > 0.80 | ~0.82 |
-| Prediction Latency | < 100ms | ~20ms |
-
----
-
-## Future Enhancements
-
-1. **Online Learning** - Continuous model updates with new data
-2. **SHAP Explainability** - Feature importance for each prediction
-3. **Carbon Optimization** - Grid carbon intensity integration
-4. **Multi-zone Support** - Per-zone occupancy and energy prediction
-5. **Weather Integration** - External temperature/humidity effects
+### Human Oversight
+- Anomalies are flagged for human investigation
+- Facility managers can override AI decisions
+- All predictions logged for audit trail
 
 ---
 
 ## Troubleshooting
 
-### Models Not Loading
+### Gemini Not Initializing
 ```
-EcoBrain: Model file not found: ...
+EcoBrain: GEMINI_API_KEY not found in environment.
 ```
-**Solution:** Run `python src/model_trainer.py` to generate models.
+**Solution:** Set the `GEMINI_API_KEY` environment variable.
 
-### High Anomaly Rate
-**Possible causes:**
-- Sensor malfunction
-- Model drift (retrain with recent data)
-- Actual building anomalies (investigate)
+### Package Not Installed
+```
+Warning: google-genai not installed. Using fallback mode.
+```
+**Solution:** Run `pip install google-genai`
 
-### Low Confidence Scores
-**Possible causes:**
-- Insufficient training data
-- High variance in building patterns
-- Unusual conditions not in training set
+### API Errors
+If Gemini API returns errors, the system automatically falls back to rule-based predictions.
 
 ---
 
-## Contact
+## Performance
 
-For AI-related questions, refer to the AI Specialist role in the implementation plan.
+| Metric | Target | Typical |
+|--------|--------|---------|
+| Prediction Latency | < 500ms | ~200-400ms |
+| Confidence Score | > 0.7 | ~0.8-0.9 |
+| Uptime | 99.9% | With fallback |
+
+---
+
+## Future Enhancements
+
+1. **Fine-tuning** - Custom model training on building-specific data
+2. **Multi-building** - Support for multiple buildings with different profiles
+3. **Weather Integration** - External weather data for better predictions
+4. **Demand Response** - Grid-aware energy optimization
+5. **Predictive Maintenance** - Equipment failure prediction
