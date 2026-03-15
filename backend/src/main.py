@@ -24,6 +24,7 @@ sys.path.append(str(Path(__file__).parent))
 
 from ai_module import ai_brain
 from chatbot import chatbot
+from ai_controller import ai_controller, ControlAction
 from models import (
     ResourceType, AlertStatus, AlertSeverity, ResourceStatus, data_store,
     Zone, Resource, Alert
@@ -677,7 +678,7 @@ def chatbot_message(user_id: str, message: str):
 def chatbot_init(user_id: str):
     """
     Initialize a chatbot session for a user.
-    
+
     Returns initial greeting and conversation options.
     """
     try:
@@ -687,16 +688,148 @@ def chatbot_init(user_id: str):
                 "step": "greeting",
                 "context": {}
             }
-        
+
         # Get the initial greeting
         greeting_response = chatbot.handle_greeting(user_id, "")
-        
+
         return {
             "success": True,
             "response": greeting_response
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error initializing chatbot: {str(e)}")
+
+
+# ==================== Natural Language Control Endpoint ====================
+
+@app.post("/api/control/natural")
+def natural_language_control(request: dict):
+    """
+    Process a natural language control command.
+    
+    Request body:
+    {
+        "message": "limit water usage on floor 2 to 60%",
+        "context": {
+            "building_name": "Synclo Tower",
+            "current_floor": 2,
+            "total_floors": 10
+        }
+    }
+    
+    Returns:
+    {
+        "success": true,
+        "message": "✅ Successfully limited water on floor 2 to 60%. 3 resource(s) updated.",
+        "resources_affected": ["cafe_water", "break_water", "garden_water"],
+        "previous_values": {...},
+        "new_values": {...},
+        "estimated_impact": "Estimated energy savings: 5-15% reduction in consumption"
+    }
+    """
+    try:
+        user_message = request.get("message", "")
+        context = request.get("context", {})
+        
+        if not user_message:
+            raise HTTPException(status_code=400, detail="Message is required")
+        
+        # Parse the natural language command
+        parsed = ai_controller.parse_command(user_message, context)
+        
+        # Execute the command
+        result = ai_controller.execute_command(parsed, context)
+        
+        # Generate natural language response
+        response_message = ai_controller.generate_response(user_message, result, context)
+        
+        return {
+            "success": result.success,
+            "message": response_message,
+            "parsed_command": {
+                "action": parsed.action.value,
+                "resource_type": parsed.resource_type.value if parsed.resource_type else None,
+                "floor": parsed.floor,
+                "value": parsed.value,
+                "confidence": parsed.confidence
+            },
+            "resources_affected": result.resources_affected,
+            "previous_values": result.previous_values,
+            "new_values": result.new_values,
+            "estimated_impact": result.estimated_impact,
+            "needs_clarification": parsed.needs_clarification,
+            "clarification_question": parsed.clarification_question
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error processing command: {str(e)}")
+
+
+@app.get("/api/control/history")
+def get_control_history(limit: int = Query(10, ge=1, le=50)):
+    """Get recent control command history."""
+    return {
+        "count": len(ai_controller.command_history),
+        "history": ai_controller.get_command_history(limit)
+    }
+
+
+@app.post("/api/control/batch")
+def batch_control_resources(request: dict):
+    """
+    Execute multiple control actions at once.
+    
+    Request body:
+    {
+        "actions": [
+            {"resource_id": "lobby_hvac", "value": 22.0},
+            {"resource_id": "lobby_lights", "value": 70}
+        ]
+    }
+    """
+    actions = request.get("actions", [])
+    if not actions:
+        raise HTTPException(status_code=400, detail="No actions provided")
+    
+    results = []
+    for action in actions:
+        resource_id = action.get("resource_id")
+        value = action.get("value")
+        
+        if not resource_id or value is None:
+            continue
+            
+        resource = data_store.get_resource(resource_id)
+        if not resource:
+            results.append({
+                "resource_id": resource_id,
+                "success": False,
+                "error": "Resource not found"
+            })
+            continue
+            
+        if not resource.is_controllable:
+            results.append({
+                "resource_id": resource_id,
+                "success": False,
+                "error": "Resource is not controllable"
+            })
+            continue
+            
+        success = data_store.update_resource_value(resource_id, value)
+        results.append({
+            "resource_id": resource_id,
+            "success": success,
+            "previous_value": resource.current_value,
+            "new_value": value
+        })
+    
+    return {
+        "success": all(r["success"] for r in results),
+        "results": results
+    }
 
 
 # ==================== WebSocket Endpoint ====================

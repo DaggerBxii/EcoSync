@@ -19,7 +19,7 @@ interface ChatMessage {
   content: string;
   timestamp: Date;
   options?: string[];
-  type?: "greeting" | "analytics" | "building" | "general";
+  type?: "greeting" | "analytics" | "building" | "control" | "general";
   showMetrics?: boolean;
   showImprovements?: boolean;
 }
@@ -151,11 +151,66 @@ export default function DashboardPage() {
     setInputValue("");
   };
 
-  const processUserInput = (input: string) => {
+  const processUserInput = async (input: string) => {
     setIsTyping(true);
     setAnimatingSection("processing");
 
     const inputLower = input.toLowerCase();
+
+    // Check if this is a control command
+    const controlKeywords = ["limit", "set", "turn off", "turn on", "increase", "decrease", "reduce", "optimize", "adjust"];
+    const isControlCommand = controlKeywords.some(keyword => inputLower.includes(keyword));
+
+    if (isControlCommand) {
+      // Send to natural language control endpoint
+      try {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+        const response = await fetch(`${apiUrl}/api/control/natural`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            message: input,
+            context: {
+              building_name: buildingData.name,
+              current_floor: selectedFloor,
+              total_floors: buildingData.totalFloors,
+            },
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to process command");
+        }
+
+        const data = await response.json();
+        setIsTyping(false);
+        setAnimatingSection(null);
+
+        if (data.needs_clarification) {
+          addBotMessage(
+            data.clarification_question || "Could you please clarify?",
+            "general",
+            ["Floor 1", "Floor 2", "All floors"]
+          );
+        } else {
+          addBotMessage(
+            data.message,
+            "control",
+            data.success ? ["Show changes", "More actions"] : ["Try again", "Help"]
+          );
+        }
+        return;
+      } catch (error) {
+        setIsTyping(false);
+        setAnimatingSection(null);
+        addBotMessage(
+          "I'm sorry, I couldn't process that control command. Please make sure the backend is running.",
+          "general",
+          ["Help", "Try again"]
+        );
+        return;
+      }
+    }
 
     setTimeout(() => {
       setIsTyping(false);
@@ -168,9 +223,9 @@ export default function DashboardPage() {
           showBuildingFlow();
         } else {
           addBotMessage(
-            "I can help you with building analytics or show you the live building visualization. What would you like to explore?",
+            "I can help you with building analytics, control resources, or show you the live building visualization. What would you like to explore?",
             "general",
-            ["Show analytics", "Show building view"]
+            ["Show analytics", "Show building view", "Control resources"]
           );
         }
       } else if (currentStep === "analytics") {

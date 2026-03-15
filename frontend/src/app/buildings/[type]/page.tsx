@@ -4,7 +4,7 @@ import { useState, useEffect, use, useRef } from "react";
 import Link from "next/link";
 import {
   Sun, Moon, Activity, ArrowLeft, Play, Pause, ChevronUp, ChevronDown,
-  Zap, Thermometer, Droplets, Wifi, TrendingUp, BarChart3, Maximize2
+  Zap, Thermometer, Droplets, Wifi, TrendingUp, BarChart3, Maximize2, MessageSquare
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell, Label } from "recharts";
@@ -12,6 +12,7 @@ import { getResourceColor, getResourcePercentage, resourceConfigs, type Resource
 import type { BuildingType, FloorResources, Scenario } from "@/types";
 import { cn } from "@/lib/utils";
 import FloorPlan from "@/components/FloorPlan";
+import AIAssistant from "@/components/AIAssistant";
 
 const buildingConfigs: Record<BuildingType, { name: string; floors: number; baseMetrics: Partial<FloorResources> }> = {
   office: { name: "Synclo Tower", floors: 10, baseMetrics: { hvac: 75, lighting: 60, electricity: 250, water: 80, internet: 500, airQuality: 85 } },
@@ -142,7 +143,8 @@ export default function BuildingVisualizationPage({ params }: { params: Promise<
             </Link>
             <div className="flex items-center gap-4">
               <Link href="/chatbot">
-                <button className="px-4 py-2 text-sm font-medium hover:text-green-600 transition-colors">
+                <button className="px-4 py-2 text-sm font-medium hover:text-green-600 transition-colors flex items-center gap-2">
+                  <MessageSquare className="w-4 h-4" />
                   AI Assistant
                 </button>
               </Link>
@@ -576,6 +578,20 @@ export default function BuildingVisualizationPage({ params }: { params: Promise<
           buildingName={buildingData.name}
         />
       )}
+
+      {/* AI Assistant - Floating */}
+      <AIAssistant
+        buildingName={buildingData?.name}
+        currentFloor={selectedFloor}
+        totalFloors={buildingData?.floors.length}
+        onControlExecuted={(result) => {
+          // Refresh building data after control
+          if (result.success) {
+            // Could trigger a refresh here
+            console.log("Control executed:", result);
+          }
+        }}
+      />
     </div>
   );
 }
