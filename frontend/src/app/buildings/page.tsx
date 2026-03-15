@@ -77,6 +77,11 @@ export default function BuildingsPage() {
             </Link>
 
             <div className="flex items-center gap-4">
+              <Link href="/chatbot">
+                <button className="px-4 py-2 text-sm font-medium hover:text-green-600 transition-colors">
+                  AI Assistant
+                </button>
+              </Link>
               <button
                 onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
                 className="p-2 rounded-lg hover:bg-muted transition-colors"
