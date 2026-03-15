@@ -112,6 +112,82 @@ function ConsumerDashboardContent() {
           className="mb-8"
         />
 
+        {/* Energy Distribution Pie Chart */}
+        <div className="bg-white dark:bg-gray-800 rounded-3xl p-8 shadow-xl border border-gray-100 dark:border-gray-700 mb-8">
+          <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">Energy Distribution</h3>
+          <div className="grid md:grid-cols-2 gap-8">
+            {/* Pie Chart */}
+            <div className="flex justify-center">
+              <div className="relative w-64 h-64">
+                <svg viewBox="0 0 100 100" className="w-full h-full animate-[spin_30s_linear_infinite]">
+                  {/* Solar - 35% */}
+                  <circle cx="50" cy="50" r="40" fill="none" stroke="#22c55e" strokeWidth="16"
+                    strokeDasharray="88 168" strokeDashoffset="0" className="drop-shadow-lg" />
+                  {/* HVAC - 30% */}
+                  <circle cx="50" cy="50" r="40" fill="none" stroke="#3b82f6" strokeWidth="16"
+                    strokeDasharray="75 168" strokeDashoffset="-88" className="drop-shadow-lg" />
+                  {/* Appliances - 25% */}
+                  <circle cx="50" cy="50" r="40" fill="none" stroke="#f59e0b" strokeWidth="16"
+                    strokeDasharray="63 168" strokeDashoffset="-163" className="drop-shadow-lg" />
+                  {/* Other - 10% */}
+                  <circle cx="50" cy="50" r="40" fill="none" stroke="#8b5cf6" strokeWidth="16"
+                    strokeDasharray="25 168" strokeDashoffset="-226" className="drop-shadow-lg" />
+                </svg>
+                {/* Center Label */}
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="text-center">
+                    <div className="text-3xl font-bold text-gray-900 dark:text-white">{metrics.watts.toLocaleString()}</div>
+                    <div className="text-sm text-gray-500">Total Watts</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            {/* Legend */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between p-4 bg-green-50 dark:bg-green-900/20 rounded-xl">
+                <div className="flex items-center gap-3">
+                  <div className="w-4 h-4 rounded-full bg-green-500" />
+                  <span className="font-medium text-gray-900 dark:text-white">Solar</span>
+                </div>
+                <div className="text-right">
+                  <div className="font-bold text-green-600">35%</div>
+                  <div className="text-sm text-gray-500">{(metrics.solar_generation).toLocaleString()}W</div>
+                </div>
+              </div>
+              <div className="flex items-center justify-between p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl">
+                <div className="flex items-center gap-3">
+                  <div className="w-4 h-4 rounded-full bg-blue-500" />
+                  <span className="font-medium text-gray-900 dark:text-white">HVAC</span>
+                </div>
+                <div className="text-right">
+                  <div className="font-bold text-blue-600">30%</div>
+                  <div className="text-sm text-gray-500">{Math.floor(metrics.watts * 0.3).toLocaleString()}W</div>
+                </div>
+              </div>
+              <div className="flex items-center justify-between p-4 bg-amber-50 dark:bg-amber-900/20 rounded-xl">
+                <div className="flex items-center gap-3">
+                  <div className="w-4 h-4 rounded-full bg-amber-500" />
+                  <span className="font-medium text-gray-900 dark:text-white">Appliances</span>
+                </div>
+                <div className="text-right">
+                  <div className="font-bold text-amber-600">25%</div>
+                  <div className="text-sm text-gray-500">{Math.floor(metrics.watts * 0.25).toLocaleString()}W</div>
+                </div>
+              </div>
+              <div className="flex items-center justify-between p-4 bg-purple-50 dark:bg-purple-900/20 rounded-xl">
+                <div className="flex items-center gap-3">
+                  <div className="w-4 h-4 rounded-full bg-purple-500" />
+                  <span className="font-medium text-gray-900 dark:text-white">Other</span>
+                </div>
+                <div className="text-right">
+                  <div className="font-bold text-purple-600">10%</div>
+                  <div className="text-sm text-gray-500">{Math.floor(metrics.watts * 0.1).toLocaleString()}W</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Metrics Grid */}
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <MetricCard
