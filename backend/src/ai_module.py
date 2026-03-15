@@ -328,6 +328,20 @@ Respond with ONLY the JSON object, no additional text."""
                 clean_response = clean_response[:-3]
             clean_response = clean_response.strip()
 
+            # Try to fix common JSON issues from Gemini
+            import re
+            
+            # Remove trailing commas before } or ]
+            clean_response = re.sub(r',\s*}', '}', clean_response)
+            clean_response = re.sub(r',\s*]', ']', clean_response)
+            
+            # Fix unquoted property names (common Gemini issue)
+            # This regex finds property names that aren't quoted and quotes them
+            clean_response = re.sub(r'(\w+)(?=\s*:)', r'"\1"', clean_response)
+            
+            # Fix single quotes to double quotes
+            clean_response = clean_response.replace("'", '"')
+
             # Parse JSON
             data = json.loads(clean_response)
 
@@ -357,6 +371,7 @@ Respond with ONLY the JSON object, no additional text."""
 
         except json.JSONDecodeError as e:
             print(f"EcoBrain: Error parsing Gemini response: {e}")
+            print(f"EcoBrain: Raw response (first 500 chars): {response_text[:500]}")
             return self._fallback_building_decision(
                 timestamp, metrics, data_store.get_all_zones(),
                 data_store.get_all_resources(), alerts, data_store.get_critical_alerts()

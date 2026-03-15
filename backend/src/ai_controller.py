@@ -193,6 +193,13 @@ Respond with ONLY the JSON object."""
                 clean = clean[:-3]
             clean = clean.strip()
 
+            # Fix common JSON issues from Gemini
+            import re
+            clean = re.sub(r',\s*}', '}', clean)
+            clean = re.sub(r',\s*]', ']', clean)
+            clean = re.sub(r'(\w+)(?=\s*:)', r'"\1"', clean)
+            clean = clean.replace("'", '"')
+
             data = json.loads(clean)
 
             # Parse action
@@ -226,6 +233,7 @@ Respond with ONLY the JSON object."""
 
         except json.JSONDecodeError as e:
             print(f"AIController: Error parsing Gemini response: {e}")
+            print(f"AIController: Raw response (first 300 chars): {response_text[:300]}")
             return self._fallback_parse(original_text, None)
 
     def _fallback_parse(self, user_input: str, context: Optional[Dict]) -> ParsedCommand:
