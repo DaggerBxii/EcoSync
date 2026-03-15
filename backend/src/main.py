@@ -709,34 +709,54 @@ def chatbot_init(user_id: str):
 
     Returns initial greeting and conversation options.
     """
+    print(f"[CHATBOT API] Initializing chatbot for user: {user_id}")
     try:
-        # Reset and get initial greeting
-        response = chatbot_engine.reset_conversation(user_id)
-        
+        # Clear any existing history for this user
+        if user_id in new_chatbot.chat_histories:
+            del new_chatbot.chat_histories[user_id]
+            print(f"[CHATBOT API] Cleared existing history for user: {user_id}")
+
+        # Get initial greeting using the new chatbot
+        response = new_chatbot.process_message(user_id, "Hello")
+
         return {
             "success": True,
-            "response": response.message,
-            "type": response.type,
-            "options": response.options
+            "response": response["response"],
+            "type": response["type"],
+            "timestamp": response["timestamp"]
         }
     except Exception as e:
+        import traceback
+        print(f"[CHATBOT API ERROR] Error initializing chatbot: {str(e)}")
+        print(f"[CHATBOT API ERROR] Traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"Error initializing chatbot: {str(e)}")
 
 
 @app.post("/api/chatbot/reset")
 def chatbot_reset(request: dict):
     """Reset a user's conversation."""
+    print(f"[CHATBOT API] Reset called - request: {request}")
     try:
         user_id = request.get("user_id", "default_user")
-        response = chatbot_engine.reset_conversation(user_id)
         
+        # Clear history for this user
+        if user_id in new_chatbot.chat_histories:
+            del new_chatbot.chat_histories[user_id]
+            print(f"[CHATBOT API] Cleared history for user: {user_id}")
+
+        # Get fresh greeting
+        response = new_chatbot.process_message(user_id, "Hello")
+
         return {
             "success": True,
-            "response": response.message,
-            "type": response.type,
-            "options": response.options
+            "response": response["response"],
+            "type": response["type"],
+            "timestamp": response["timestamp"]
         }
     except Exception as e:
+        import traceback
+        print(f"[CHATBOT API ERROR] Error resetting chatbot: {str(e)}")
+        print(f"[CHATBOT API ERROR] Traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"Error resetting chatbot: {str(e)}")
 
 
