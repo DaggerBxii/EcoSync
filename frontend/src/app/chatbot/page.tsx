@@ -134,6 +134,7 @@ export default function ChatbotPage() {
 
       if (response.ok) {
         const data = await response.json();
+        console.log("Chatbot response:", data);
         if (data.success) {
           const assistantMessage: Message = {
             id: (Date.now() + 1).toString(),
@@ -144,9 +145,13 @@ export default function ChatbotPage() {
           };
           setMessages((prev) => [...prev, assistantMessage]);
           setCurrentOptions(data.options || []);
+        } else {
+          throw new Error(data.error || "Backend returned success: false");
         }
       } else {
-        throw new Error("Failed to get response");
+        const errorData = await response.json().catch(() => ({}));
+        console.error("Chatbot API error:", response.status, errorData);
+        throw new Error(errorData.error || `HTTP ${response.status}`);
       }
     } catch (error) {
       console.error("Error sending message:", error);
