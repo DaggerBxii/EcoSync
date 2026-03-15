@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EcoSync - Data Center Dashboard</title>
+  <style>
+    :root {
+      --ecosync-green: #10b981;
+      --ecosync-green-dark: #059669;
+      --ecosync-green-light: #34d399;
+      --ecosync-green-pale: #d1fae5;
+      --ecosync-blue: #3b82f6;
+      --ecosync-blue-dark: #2563eb;
+      --ecosync-blue-light: #60a5fa;
+      --ecosync-blue-pale: #dbeafe;
+      --ecosync-purple: #8b5cf6;
+      --ecosync-purple-dark: #7c3aed;
+      --ecosync-purple-light: #a78bfa;
+      --ecosync-purple-pale: #ede9fe;
+      --ecosync-cyan: #06b6d4;
+      --ecosync-cyan-light: #22d3ee;
+      --gray-50: #f9fafb;
+      --gray-100: #f3f4f6;
+      --gray-200: #e5e7eb;
+      --gray-300: #d1d5db;
+      --gray-400: #9ca3af;
+      --gray-500: #6b7280;
+      --gray-600: #4b5563;
+      --gray-700: #374151;
+      --gray-800: #1f2937;
+      --gray-900: #111827;
+      --gray-950: #030712;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #1a1a2e 100%);
+      min-height: 100vh;
+      color: #ffffff;
+    }
+
+    /* Navigation */
+    .nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      background: rgba(17, 24, 39, 0.95);
+      backdrop-filter: blur(10px);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+      z-index: 100;
+    }
+
+    .nav-content {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 1rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      text-decoration: none;
+      color: white;
+    }
+
+    .logo-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, var(--ecosync-green), var(--ecosync-blue), var(--ecosync-purple));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: bold;
+      font-size: 1.25rem;
+    }
+
+    .logo-text {
+      font-size: 1.25rem;
+      font-weight: 700;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 1rem;
+      align-items: center;
+    }
+
+    .nav-link {
+      text-decoration: none;
+      color: var(--gray-400);
+      font-weight: 500;
+      padding: 0.5rem 1rem;
+      border-radius: 9999px;
+      transition: all 0.2s;
+    }
+
+    .nav-link:hover {
+      background: var(--gray-800);
+      color: white;
+    }
+
+    .nav-link.active {
+      background: var(--ecosync-purple);
+      color: white;
+    }
+
+    .btn-primary {
+      background: var(--ecosync-purple);
+      color: white;
+      padding: 0.625rem 1.5rem;
+      border-radius: 9999px;
+      text-decoration: none;
+      font-weight: 600;
+      transition: all 0.2s;
+      border: none;
+      cursor: pointer;
+    }
+
+    .btn-primary:hover {
+      background: var(--ecosync-purple-dark);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+    }
+
+    /* Main Content */
+    .main {
+      padding-top: 5rem;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 2rem;
+    }
+
+    /* Header */
+    .dashboard-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 2rem;
+    }
+
+    .dashboard-title h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      color: white;
+      margin-bottom: 0.25rem;
+    }
+
+    .dashboard-title p {
+      color: var(--gray-400);
+    }
+
+    /* Status Indicator */
+    .status-indicator {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .status-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--ecosync-green);
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    .status-text {
+      font-weight: 600;
+      color: var(--ecosync-green);
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    /* Alert Banner */
+    .alert-banner {
+      background: rgba(16, 185, 129, 0.1);
+      border: 2px solid var(--ecosync-green);
+      border-radius: 12px;
+      padding: 1rem 1.25rem;
+      margin-bottom: 2rem;
+      display: flex;
+      align-items: flex-start;
+      gap: 0.75rem;
+    }
+
+    .alert-icon {
+      font-size: 1.25rem;
+    }
+
+    .alert-content h4 {
+      font-weight: 600;
+      color: var(--ecosync-green);
+      margin-bottom: 0.25rem;
+    }
+
+    .alert-content p {
+      color: var(--ecosync-green);
+      opacity: 0.8;
+      font-size: 0.875rem;
+    }
+
+    /* Metrics Grid */
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1.5rem;
+      margin-bottom: 2rem;
+    }
+
+    .metric-card {
+      background: rgba(31, 41, 55, 0.8);
+      border-radius: 16px;
+      padding: 1.5rem;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+      border: 1px solid var(--gray-700);
+    }
+
+    .metric-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+
+    .metric-icon {
+      width: 40px;
+      height: 40px;
+      background: rgba(139, 92, 246, 0.2);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--ecosync-purple);
+    }
+
+    .metric-trend {
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: var(--ecosync-green);
+    }
+
+    .metric-value {
+      font-size: 2.5rem;
+      font-weight: 700;
+      color: white;
+      margin-bottom: 0.25rem;
+    }
+
+    .metric-unit {
+      font-size: 1rem;
+      color: var(--gray-400);
+      margin-left: 0.25rem;
+    }
+
+    .metric-label {
+      color: var(--gray-400);
+      font-size: 0.875rem;
+    }
+
+    /* Cluster Section */
+    .cluster-section {
+      background: rgba(31, 41, 55, 0.8);
+      border-radius: 16px;
+      padding: 1.5rem;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+      border: 1px solid var(--gray-700);
+      margin-bottom: 2rem;
+    }
+
+    .cluster-section h3 {
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: white;
+      margin-bottom: 1.5rem;
+    }
+
+    .cluster-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1rem;
+    }
+
+    .cluster-card {
+      padding: 1rem;
+      border-radius: 12px;
+      background: rgba(17, 24, 39, 0.8);
+      border: 1px solid var(--gray-700);
+    }
+
+    .cluster-name {
+      font-weight: 600;
+      color: white;
+      margin-bottom: 0.25rem;
+    }
+
+    .cluster-nodes {
+      font-size: 0.875rem;
+      color: var(--gray-400);
+      margin-bottom: 0.75rem;
+    }
+
+    .cluster-progress {
+      height: 6px;
+      background: var(--gray-700);
+      border-radius: 9999px;
+      overflow: hidden;
+    }
+
+    .cluster-progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--ecosync-purple), var(--ecosync-blue));
+      border-radius: 9999px;
+      transition: width 0.3s ease;
+    }
+
+    .cluster-util {
+      font-size: 0.75rem;
+      color: var(--gray-400);
+      margin-top: 0.5rem;
+    }
+
+    /* Secondary Grid */
+    .secondary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 1.5rem;
+    }
+
+    .info-card {
+      background: rgba(31, 41, 55, 0.8);
+      border-radius: 16px;
+      padding: 1.5rem;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+      border: 1px solid var(--gray-700);
+    }
+
+    .info-card h3 {
+      font-size: 1.125rem;
+      font-weight: 600;
+      color: white;
+      margin-bottom: 1rem;
+    }
+
+    .info-value {
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--ecosync-cyan);
+      margin-bottom: 0.5rem;
+    }
+
+    .info-label {
+      color: var(--gray-400);
+      font-size: 0.875rem;
+    }
+
+    /* Footer */
+    .footer {
+      margin-top: 4rem;
+      padding: 2rem;
+      background: var(--gray-950);
+      color: white;
+      text-align: center;
+    }
+
+    .footer-logo {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+
+    .footer-logo-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, var(--ecosync-green), var(--ecosync-blue), var(--ecosync-purple));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: bold;
+    }
+
+    .footer-text {
+      color: var(--gray-400);
+      font-size: 0.875rem;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .nav-content {
+        padding: 1rem;
+      }
+
+      .nav-links {
+        display: none;
+      }
+
+      .container {
+        padding: 1rem;
+      }
+
+      .dashboard-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1rem;
+      }
+
+      .metrics-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .cluster-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .secondary-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Navigation -->
+  <nav class="nav">
+    <div class="nav-content">
+      <a href="/" class="logo">
+        <div class="logo-icon">E</div>
+        <span class="logo-text">EcoSync</span>
+      </a>
+      <div class="nav-links">
+        <a href="/consumer.html" class="nav-link">Consumer</a>
+        <a href="/enterprise.html" class="nav-link">Enterprise</a>
+        <a href="/datacenter.html" class="nav-link active">Data Center</a>
+      </div>
+      <a href="/" class="btn-primary">Back to Home</a>
+    </div>
+  </nav>
+
+  <!-- Main Content -->
+  <main class="main">
+    <div class="container">
+      <!-- Header -->
+      <div class="dashboard-header">
+        <div class="dashboard-title">
+          <h1>Data Center Dashboard</h1>
+          <p>High-performance compute facility management</p>
+        </div>
+        <div class="status-indicator">
+          <div class="status-dot"></div>
+          <span class="status-text">Optimal</span>
+        </div>
+      </div>
+
+      <!-- Alert Banner -->
+      <div class="alert-banner">
+        <span class="alert-icon">✅</span>
+        <div class="alert-content">
+          <h4>Optimal Job Window Detected</h4>
+          <p>High renewable energy availability forecast for next 4 hours. Consider scheduling energy-intensive training jobs.</p>
+        </div>
+      </div>
+
+      <!-- Primary Metrics -->
+      <div class="metrics-grid">
+        <div class="metric-card">
+          <div class="metric-header">
+            <div class="metric-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="4" y="4" width="16" height="16" rx="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <rect x="8" y="8" width="8" height="8" fill="currentColor"/>
+                <path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 14h3M1 9h3M1 14h3" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <span class="metric-trend">↑ 72% avg</span>
+          </div>
+          <div class="metric-value">72<span class="metric-unit">%</span></div>
+          <div class="metric-label">GPU Utilization</div>
+        </div>
+
+        <div class="metric-card">
+          <div class="metric-header">
+            <div class="metric-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="2" y="2" width="20" height="8" rx="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <rect x="2" y="14" width="20" height="8" rx="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <circle cx="6" cy="6" r="1" fill="currentColor"/>
+                <circle cx="6" cy="18" r="1" fill="currentColor"/>
+              </svg>
+            </div>
+            <span class="metric-trend">↓ Target: 1.30</span>
+          </div>
+          <div class="metric-value">1.32</div>
+          <div class="metric-label">PUE (Power Usage Effectiveness)</div>
+        </div>
+
+        <div class="metric-card">
+          <div class="metric-header">
+            <div class="metric-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="5" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <span class="metric-trend">↑ Renewable</span>
+          </div>
+          <div class="metric-value">65<span class="metric-unit">%</span></div>
+          <div class="metric-label">Renewable Forecast</div>
+        </div>
+
+        <div class="metric-card">
+          <div class="metric-header">
+            <div class="metric-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M13 2v7h7" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
+            <span class="metric-trend">→ Normal</span>
+          </div>
+          <div class="metric-value">45<span class="metric-unit">jobs</span></div>
+          <div class="metric-label">Job Queue</div>
+        </div>
+      </div>
+
+      <!-- Cluster Status -->
+      <div class="cluster-section">
+        <h3>Compute Clusters</h3>
+        <div class="cluster-grid">
+          <div class="cluster-card">
+            <div class="cluster-name">GPU Cluster A</div>
+            <div class="cluster-nodes">32 nodes</div>
+            <div class="cluster-progress">
+              <div class="cluster-progress-fill" style="width: 85%"></div>
+            </div>
+            <div class="cluster-util">85% utilization</div>
+          </div>
+          <div class="cluster-card">
+            <div class="cluster-name">GPU Cluster B</div>
+            <div class="cluster-nodes">32 nodes</div>
+            <div class="cluster-progress">
+              <div class="cluster-progress-fill" style="width: 72%"></div>
+            </div>
+            <div class="cluster-util">72% utilization</div>
+          </div>
+          <div class="cluster-card">
+            <div class="cluster-name">CPU Cluster</div>
+            <div class="cluster-nodes">64 nodes</div>
+            <div class="cluster-progress">
+              <div class="cluster-progress-fill" style="width: 45%"></div>
+            </div>
+            <div class="cluster-util">45% utilization</div>
+          </div>
+          <div class="cluster-card">
+            <div class="cluster-name">Storage</div>
+            <div class="cluster-nodes">16 nodes</div>
+            <div class="cluster-progress">
+              <div class="cluster-progress-fill" style="width: 60%"></div>
+            </div>
+            <div class="cluster-util">60% utilization</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Secondary Metrics -->
+      <div class="secondary-grid">
+        <div class="info-card">
+          <h3>Cooling Load</h3>
+          <div class="info-value" style="color: var(--ecosync-cyan);">380 kW</div>
+          <div class="info-label">Current cooling power consumption</div>
+        </div>
+
+        <div class="info-card">
+          <h3>Network Throughput</h3>
+          <div class="info-value" style="color: var(--ecosync-blue);">85 Gbps</div>
+          <div class="info-label">Current network bandwidth</div>
+        </div>
+
+        <div class="info-card">
+          <h3>Carbon Intensity</h3>
+          <div class="info-value" style="color: var(--ecosync-green);">380</div>
+          <div class="info-label">gCO₂/kWh grid intensity</div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="footer-logo">
+      <div class="footer-logo-icon">E</div>
+      <span style="font-size: 1.25rem; font-weight: 700;">EcoSync</span>
+    </div>
+    <p class="footer-text">© 2026 EcoSync. Intelligent sustainability orchestration platform.</p>
+  </footer>
+
+  <script>
+    // Simulate real-time data updates
+    function updateMetrics() {
+      // Update GPU utilization
+      const gpuCard = document.querySelectorAll('.metric-card')[0];
+      if (gpuCard) {
+        const newValue = Math.floor(60 + Math.random() * 35);
+        gpuCard.querySelector('.metric-value').innerHTML = newValue + '<span class="metric-unit">%</span>';
+      }
+
+      // Update PUE
+      const pueCard = document.querySelectorAll('.metric-card')[1];
+      if (pueCard) {
+        const newValue = (1.25 + Math.random() * 0.2).toFixed(2);
+        pueCard.querySelector('.metric-value').textContent = newValue;
+      }
+
+      // Update renewable forecast
+      const renewableCard = document.querySelectorAll('.metric-card')[2];
+      if (renewableCard) {
+        const newValue = Math.floor(50 + Math.random() * 40);
+        renewableCard.querySelector('.metric-value').innerHTML = newValue + '<span class="metric-unit">%</span>';
+      }
+
+      // Update job queue
+      const jobCard = document.querySelectorAll('.metric-card')[3];
+      if (jobCard) {
+        const newValue = Math.floor(30 + Math.random() * 50);
+        jobCard.querySelector('.metric-value').innerHTML = newValue + '<span class="metric-unit">jobs</span>';
+      }
+
+      // Update cluster utilization
+      const progressFills = document.querySelectorAll('.cluster-progress-fill');
+      const utils = document.querySelectorAll('.cluster-util');
+      progressFills.forEach((fill, i) => {
+        const newUtil = 40 + Math.random() * 50;
+        fill.style.width = newUtil + '%';
+        if (utils[i]) {
+          utils[i].textContent = Math.floor(newUtil) + '% utilization';
+        }
+      });
+
+      // Update secondary metrics
+      const infoCards = document.querySelectorAll('.info-card');
+      if (infoCards[0]) {
+        const coolingValue = Math.floor(350 + Math.random() * 100);
+        infoCards[0].querySelector('.info-value').textContent = coolingValue + ' kW';
+      }
+      if (infoCards[1]) {
+        const networkValue = Math.floor(70 + Math.random() * 25);
+        infoCards[1].querySelector('.info-value').textContent = networkValue + ' Gbps';
+      }
+      if (infoCards[2]) {
+        const carbonValue = Math.floor(350 + Math.random() * 100);
+        infoCards[2].querySelector('.info-value').textContent = carbonValue;
+      }
+    }
+
+    // Update every 5 seconds
+    setInterval(updateMetrics, 5000);
+  </script>
+</body>
+</html>
