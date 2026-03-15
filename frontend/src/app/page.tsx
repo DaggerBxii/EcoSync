@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import EcoSyncWebSocket from "./EcoSyncWebSocket";
 
 // Energy Resource Icons
 const SolarIcon = () => (
@@ -600,6 +601,10 @@ function DashboardSection() {
                 </div>
               ))}
             </div>
+          </div>
+          {/* Live EcoSync Data from Backend */}
+          <div className="mt-8">
+            <EcoSyncWebSocket />
           </div>
         </div>
       </div>
