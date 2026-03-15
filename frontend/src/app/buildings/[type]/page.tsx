@@ -4,13 +4,14 @@ import { useState, useEffect, use, useRef } from "react";
 import Link from "next/link";
 import {
   Sun, Moon, Activity, ArrowLeft, Play, Pause, ChevronUp, ChevronDown,
-  Zap, Thermometer, Droplets, Wifi, TrendingUp, BarChart3
+  Zap, Thermometer, Droplets, Wifi, TrendingUp, BarChart3, Maximize2
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell, Label } from "recharts";
 import { getResourceColor, getResourcePercentage, resourceConfigs, type ResourceKey } from "@/lib/colorScales";
 import type { BuildingType, FloorResources, Scenario } from "@/types";
 import { cn } from "@/lib/utils";
+import FloorPlan from "@/components/FloorPlan";
 
 const buildingConfigs: Record<BuildingType, { name: string; floors: number; baseMetrics: Partial<FloorResources> }> = {
   office: { name: "Synclo Tower", floors: 10, baseMetrics: { hvac: 75, lighting: 60, electricity: 250, water: 80, internet: 500, airQuality: 85 } },
@@ -55,6 +56,7 @@ export default function BuildingVisualizationPage({ params }: { params: Promise<
   const [buildingData, setBuildingData] = useState<{ name: string; floors: FloorResources[]; alignmentBefore: number; alignmentAfter: number } | null>(null);
   const [showGreeting, setShowGreeting] = useState(true);
   const [greetingStep, setGreetingStep] = useState(0);
+  const [showFloorPlan, setShowFloorPlan] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -470,8 +472,17 @@ export default function BuildingVisualizationPage({ params }: { params: Promise<
 
               {/* Selected Floor Detail */}
               {selectedFloor && (
-                <div className="mt-8 p-6 bg-gradient-to-r from-green-50 to-blue-50 dark:from-green-900/20 dark:to-blue-900/20 rounded-2xl border-2 border-green-300 dark:border-green-700">
-                  <h4 className="text-xl font-bold mb-4">Floor {selectedFloor} - All Resources</h4>
+                <div className="mt-8 p-6 bg-gradient-to-r from-green-50 to-blue-50 dark:from-green-900/20 dark:to-blue-900/20 rounded-2xl border-2 border-green-300 dark:border-green-700 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="text-xl font-bold">Floor {selectedFloor} - All Resources</h4>
+                    <button
+                      onClick={() => setShowFloorPlan(true)}
+                      className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-full transition-all shadow-lg hover:shadow-xl"
+                    >
+                      <Maximize2 className="w-4 h-4" />
+                      View Floor Plan
+                    </button>
+                  </div>
                   <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {(Object.keys(resourceConfigs) as ResourceKey[]).map((key) => {
                       const config = resourceConfigs[key];
@@ -481,7 +492,8 @@ export default function BuildingVisualizationPage({ params }: { params: Promise<
                       const color = getResourceColor(key, value);
                       const percentage = getResourcePercentage(key, value);
                       return (
-                        <div key={key} className="bg-background rounded-xl p-4 shadow-md">
+                        <div key={key} className="bg-background rounded-xl p-4 shadow-md hover:shadow-lg transition-shadow cursor-pointer"
+                          onClick={() => setShowFloorPlan(true)}>
                           <div className="flex items-center gap-2 mb-2">
                             <span className="text-xl">{config.icon}</span>
                             <span className="font-semibold">{config.label}</span>
@@ -549,6 +561,21 @@ export default function BuildingVisualizationPage({ params }: { params: Promise<
       <div aria-live="polite" className="sr-only">
         Scenario: {scenario}. {selectedFloor ? `Floor ${selectedFloor} ${currentResource.label}: ${buildingData.floors.find(f => f.floor === selectedFloor)?.[selectedResource].toFixed(1)} ${currentResource.unit}` : ""}
       </div>
+
+      {/* Floor Plan Modal */}
+      {showFloorPlan && selectedFloor && buildingData && (
+        <FloorPlan
+          floor={selectedFloor}
+          data={{
+            electricity: buildingData.floors.find(f => f.floor === selectedFloor)?.electricity || 0,
+            hvac: buildingData.floors.find(f => f.floor === selectedFloor)?.hvac || 0,
+            water: buildingData.floors.find(f => f.floor === selectedFloor)?.water || 0,
+            lighting: buildingData.floors.find(f => f.floor === selectedFloor)?.lighting || 0,
+          }}
+          onClose={() => setShowFloorPlan(false)}
+          buildingName={buildingData.name}
+        />
+      )}
     </div>
   );
 }

@@ -6,11 +6,12 @@ import Link from "next/link";
 import {
   Activity, Sun, Moon, Building2, TrendingUp, DollarSign,
   Clock, Users, ArrowRight, MessageSquare, Send, X,
-  BarChart3, Zap, Droplets, Thermometer, Wifi
+  BarChart3, Zap, Droplets, Thermometer, Wifi, ChevronRight, Sparkles
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { toast } from "sonner";
-import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell, Label } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell } from "recharts";
+import { cn } from "@/lib/utils";
 
 interface ChatMessage {
   id: string;
@@ -19,14 +20,8 @@ interface ChatMessage {
   timestamp: Date;
   options?: string[];
   type?: "greeting" | "analytics" | "building" | "general";
-}
-
-interface FloorData {
-  floor: number;
-  electricity: number;
-  hvac: number;
-  water: number;
-  lighting: number;
+  showMetrics?: boolean;
+  showImprovements?: boolean;
 }
 
 export default function DashboardPage() {
@@ -40,6 +35,7 @@ export default function DashboardPage() {
   const [isTyping, setIsTyping] = useState(false);
   const [currentStep, setCurrentStep] = useState<"greeting" | "analytics" | "building" | "done">("greeting");
   const [selectedFloor, setSelectedFloor] = useState<number | null>(null);
+  const [animatingSection, setAnimatingSection] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Mock building data
@@ -62,6 +58,13 @@ export default function DashboardPage() {
     { name: "After Synclo", value: buildingData.alignmentAfter, fill: "#10b981" },
   ];
 
+  const totalMetrics = {
+    electricity: buildingData.floors.reduce((sum, f) => sum + f.electricity, 0),
+    hvac: Math.round(buildingData.floors.reduce((sum, f) => sum + f.hvac, 0) / buildingData.floors.length),
+    water: buildingData.floors.reduce((sum, f) => sum + f.water, 0),
+    lighting: Math.round(buildingData.floors.reduce((sum, f) => sum + f.lighting, 0) / buildingData.floors.length),
+  };
+
   useEffect(() => {
     setIsLoaded(true);
     const userData = localStorage.getItem("synclo_user");
@@ -72,23 +75,30 @@ export default function DashboardPage() {
     }
   }, [router]);
 
+  // Start greeting animation
   useEffect(() => {
     if (isLoaded && user && messages.length === 0) {
-      // Start conversation with greeting
       setTimeout(() => {
         addBotMessage(
-          `Hello ${user.name.split(" ")[0]}! 👋 Welcome to Synclo. I'm your building intelligence assistant.`,
+          `Hello ${user.name.split(" ")[0]}! 👋`,
           "greeting"
         );
       }, 500);
-
+      
+      setTimeout(() => {
+        addBotMessage(
+          `Welcome to Synclo. I'm your building intelligence assistant.`,
+          "greeting"
+        );
+      }, 1200);
+      
       setTimeout(() => {
         addBotMessage(
           `Would you like to see the analytics for today?`,
           "greeting",
           ["Yes, show me analytics", "Skip to building view"]
         );
-      }, 1500);
+      }, 2000);
     }
   }, [isLoaded, user]);
 
@@ -100,16 +110,17 @@ export default function DashboardPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
-  const addBotMessage = (content: string, type: ChatMessage["type"] = "general", options?: string[]) => {
+  const addBotMessage = (content: string, type: ChatMessage["type"] = "general", options?: string[], extras?: Partial<ChatMessage>) => {
     setMessages((prev) => [
       ...prev,
       {
-        id: Date.now().toString(),
+        id: Date.now().toString() + Math.random(),
         role: "assistant",
         content,
         timestamp: new Date(),
         type,
         options,
+        ...extras,
       },
     ]);
   };
@@ -142,79 +153,29 @@ export default function DashboardPage() {
 
   const processUserInput = (input: string) => {
     setIsTyping(true);
+    setAnimatingSection("processing");
 
     const inputLower = input.toLowerCase();
 
-    // Simulate bot thinking
     setTimeout(() => {
       setIsTyping(false);
+      setAnimatingSection(null);
 
       if (currentStep === "greeting") {
-        if (inputLower.includes("yes") || inputLower.includes("sure") || inputLower.includes("analytics")) {
-          setCurrentStep("analytics");
-          addBotMessage(
-            "Great! Let me show you today's building performance metrics.",
-            "analytics"
-          );
-          setTimeout(() => {
-            addBotMessage(
-              `These are the initial metrics for ${buildingData.name}:`,
-              "analytics"
-            );
-          }, 800);
-          setTimeout(() => {
-            addBotMessage(
-              `📊 **Electricity**: ${buildingData.floors.reduce((sum, f) => sum + f.electricity, 0)} kW total\n` +
-              `🌡️ **HVAC**: ${Math.round(buildingData.floors.reduce((sum, f) => sum + f.hvac, 0) / buildingData.floors.length)}°C average\n` +
-              `💧 **Water**: ${buildingData.floors.reduce((sum, f) => sum + f.water, 0)} L/min\n` +
-              `💡 **Lighting**: ${Math.round(buildingData.floors.reduce((sum, f) => sum + f.lighting, 0) / buildingData.floors.length)}% brightness`,
-              "analytics"
-            );
-          }, 1600);
-          setTimeout(() => {
-            addBotMessage(
-              `And these are the metrics after using Synclo:\n\n` +
-              `✅ Energy consumption reduced by **32%**\n` +
-              `✅ HVAC efficiency improved by **28%**\n` +
-              `✅ Water usage optimized by **24%**\n` +
-              `✅ Lighting costs reduced by **35%**\n\n` +
-              `Would you like to explore the building visualization?`,
-              "analytics",
-              ["Show building view", "More details"]
-            );
-          }, 2400);
+        if (inputLower.includes("yes") || inputLower.includes("analytics") || inputLower.includes("show")) {
+          showAnalyticsFlow();
         } else if (inputLower.includes("skip") || inputLower.includes("building")) {
-          setCurrentStep("building");
-          addBotMessage(
-            `Sure! Let me show you the ${buildingData.name} visualization.`,
-            "building"
-          );
-          setTimeout(() => {
-            addBotMessage(
-              `What floor would you like to examine?`,
-              "building"
-            );
-          }, 800);
+          showBuildingFlow();
         } else {
           addBotMessage(
-            "I can help you with building analytics, resource optimization, or show you the live building visualization. What would you like to explore?",
+            "I can help you with building analytics or show you the live building visualization. What would you like to explore?",
             "general",
             ["Show analytics", "Show building view"]
           );
         }
       } else if (currentStep === "analytics") {
         if (inputLower.includes("building") || inputLower.includes("show") || inputLower.includes("explore")) {
-          setCurrentStep("building");
-          addBotMessage(
-            `Here's the real-time visualization of ${buildingData.name}.`,
-            "building"
-          );
-          setTimeout(() => {
-            addBotMessage(
-              `What floor would you like to examine? Click on any floor or select from the list.`,
-              "building"
-            );
-          }, 800);
+          showBuildingFlow();
         } else if (inputLower.includes("more") || inputLower.includes("detail")) {
           addBotMessage(
             `📈 **Detailed Analytics**:\n\n` +
@@ -277,7 +238,71 @@ export default function DashboardPage() {
       }
 
       scrollToBottom();
-    }, 600 + Math.random() * 400);
+    }, 800);
+  };
+
+  const showAnalyticsFlow = () => {
+    setCurrentStep("analytics");
+    setAnimatingSection("analytics");
+    
+    // Step 1: Introduction
+    setTimeout(() => {
+      addBotMessage(
+        `Great! Let me show you today's building performance metrics. 📊`,
+        "analytics"
+      );
+    }, 300);
+
+    // Step 2: Show initial metrics with animation
+    setTimeout(() => {
+      addBotMessage(
+        `Here are the current metrics for ${buildingData.name}:`,
+        "analytics",
+        undefined,
+        { showMetrics: true }
+      );
+    }, 1000);
+
+    // Step 3: Show improvements
+    setTimeout(() => {
+      addBotMessage(
+        `And here's what Synclo has achieved:`,
+        "analytics",
+        undefined,
+        { showImprovements: true }
+      );
+    }, 2000);
+
+    // Step 4: Ask about building view
+    setTimeout(() => {
+      addBotMessage(
+        `Would you like to explore the building visualization?`,
+        "analytics",
+        ["Show building view", "More details"]
+      );
+      setAnimatingSection(null);
+    }, 3200);
+  };
+
+  const showBuildingFlow = () => {
+    setCurrentStep("building");
+    setAnimatingSection("building");
+    
+    setTimeout(() => {
+      addBotMessage(
+        `Sure! Let me show you the ${buildingData.name} visualization. 🏢`,
+        "building"
+      );
+    }, 300);
+
+    setTimeout(() => {
+      addBotMessage(
+        `Click on any floor in the building view to see detailed metrics, or ask me about a specific floor.`,
+        "building",
+        ["Show all floors", "Floor 5", "Floor 10"]
+      );
+      setAnimatingSection(null);
+    }, 1200);
   };
 
   if (!isLoaded || !user) return null;
@@ -309,15 +334,14 @@ export default function DashboardPage() {
                 className="p-2 rounded-lg hover:bg-muted transition-colors"
                 aria-label="Toggle theme"
               >
-                {theme === "dark" ? (
-                  <Sun className="w-5 h-5" />
-                ) : (
-                  <Moon className="w-5 h-5" />
-                )}
+                {theme === "dark" ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
               </button>
               <button
                 onClick={() => setShowChatbot(!showChatbot)}
-                className={`p-2 rounded-lg transition-colors ${showChatbot ? "bg-green-600 text-white" : "hover:bg-muted"}`}
+                className={cn(
+                  "p-2 rounded-lg transition-colors",
+                  showChatbot ? "bg-green-600 text-white" : "hover:bg-muted"
+                )}
                 aria-label="Toggle chatbot"
               >
                 <MessageSquare className="w-5 h-5" />
@@ -353,15 +377,15 @@ export default function DashboardPage() {
             {/* Left: Quick Stats */}
             <div className="space-y-4">
               {[
-                { icon: Zap, label: "Electricity", value: `${buildingData.floors.reduce((sum, f) => sum + f.electricity, 0)} kW`, change: "-32%", color: "text-yellow-600" },
-                { icon: Thermometer, label: "HVAC", value: `${Math.round(buildingData.floors.reduce((sum, f) => sum + f.hvac, 0) / buildingData.floors.length)}°C`, change: "+28%", color: "text-red-600" },
-                { icon: Droplets, label: "Water", value: `${buildingData.floors.reduce((sum, f) => sum + f.water, 0)} L/min`, change: "-24%", color: "text-blue-600" },
+                { icon: Zap, label: "Electricity", value: `${totalMetrics.electricity} kW`, change: "-32%", color: "text-yellow-600" },
+                { icon: Thermometer, label: "HVAC", value: `${totalMetrics.hvac}°C`, change: "+28%", color: "text-red-600" },
+                { icon: Droplets, label: "Water", value: `${totalMetrics.water} L/min`, change: "-24%", color: "text-blue-600" },
                 { icon: Wifi, label: "Network", value: "847 Mbps", change: "+12%", color: "text-purple-600" },
               ].map((stat, i) => (
-                <div key={i} className="bg-background rounded-2xl p-5 shadow-lg border">
+                <div key={i} className="bg-background rounded-2xl p-5 shadow-lg border hover:shadow-xl transition-shadow">
                   <div className="flex items-center justify-between mb-3">
-                    <stat.icon className={`w-6 h-6 ${stat.color}`} />
-                    <span className={`text-xs font-semibold ${stat.change.startsWith("-") ? "text-green-600" : "text-green-600"}`}>
+                    <stat.icon className={cn("w-6 h-6", stat.color)} />
+                    <span className="text-xs font-semibold text-green-600">
                       {stat.change}
                     </span>
                   </div>
@@ -415,7 +439,10 @@ export default function DashboardPage() {
                     <button
                       key={floor.floor}
                       onClick={() => setSelectedFloor(isSelected ? null : floor.floor)}
-                      className={`relative rounded-lg shadow-md overflow-hidden transition-all hover:scale-105 ${isSelected ? "ring-2 ring-green-600 scale-105" : ""}`}
+                      className={cn(
+                        "relative rounded-lg shadow-md overflow-hidden transition-all hover:scale-105",
+                        isSelected ? "ring-2 ring-green-600 scale-105" : ""
+                      )}
                       style={{
                         width: `${200 + (10 - floor.floor) * 10}px`,
                         height: "44px",
@@ -434,32 +461,26 @@ export default function DashboardPage() {
 
               {/* Selected Floor Details */}
               {selectedFloor && (
-                <div className="p-5 bg-gradient-to-r from-green-50 to-blue-50 dark:from-green-900/20 dark:to-blue-900/20 rounded-2xl border-2 border-green-300 dark:border-green-700">
+                <div className="p-5 bg-gradient-to-r from-green-50 to-blue-50 dark:from-green-900/20 dark:to-blue-900/20 rounded-2xl border-2 border-green-300 dark:border-green-700 animate-in fade-in slide-in-from-bottom-4 duration-500">
                   <h4 className="text-lg font-bold mb-4">Floor {selectedFloor} - Detailed Metrics</h4>
                   <div className="grid md:grid-cols-4 gap-4">
-                    {(Object.entries(buildingData.floors.find((f) => f.floor === selectedFloor) || {})).map(([key, value]) => {
-                      if (key === "floor") return null;
-                      const icons: Record<string, any> = {
-                        electricity: Zap,
-                        hvac: Thermometer,
-                        water: Droplets,
-                        lighting: TrendingUp,
-                      };
-                      const units: Record<string, string> = {
-                        electricity: "kW",
-                        hvac: "°C",
-                        water: "L/min",
-                        lighting: "%",
-                      };
-                      const Icon = icons[key] || Zap;
-                      return (
-                        <div key={key} className="bg-background rounded-xl p-4 shadow-md">
-                          <Icon className="w-5 h-5 text-green-600 mb-2" />
-                          <div className="text-xs text-muted-foreground capitalize">{key}</div>
-                          <div className="text-xl font-bold">{value} {units[key]}</div>
+                    {(() => {
+                      const floor = buildingData.floors.find(f => f.floor === selectedFloor);
+                      if (!floor) return null;
+                      const metrics = [
+                        { key: "electricity", value: floor.electricity, unit: "kW", icon: Zap, color: "text-yellow-600" },
+                        { key: "hvac", value: floor.hvac, unit: "°C", icon: Thermometer, color: "text-red-600" },
+                        { key: "water", value: floor.water, unit: "L/min", icon: Droplets, color: "text-blue-600" },
+                        { key: "lighting", value: floor.lighting, unit: "%", icon: TrendingUp, color: "text-green-600" },
+                      ];
+                      return metrics.map(m => (
+                        <div key={m.key} className="bg-background rounded-xl p-4 shadow-md">
+                          <m.icon className={cn("w-5 h-5 mb-2", m.color)} />
+                          <div className="text-xs text-muted-foreground capitalize">{m.key}</div>
+                          <div className="text-xl font-bold">{m.value} {m.unit}</div>
                         </div>
-                      );
-                    })}
+                      ));
+                    })()}
                   </div>
                 </div>
               )}
@@ -516,7 +537,7 @@ export default function DashboardPage() {
           <div className="flex items-center justify-between p-4 border-b">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-600 to-green-400 flex items-center justify-center">
-                <MessageSquare className="w-5 h-5 text-white" />
+                <Sparkles className="w-5 h-5 text-white" />
               </div>
               <div>
                 <h3 className="font-bold">Synclo Assistant</h3>
@@ -537,25 +558,81 @@ export default function DashboardPage() {
             {messages.map((message) => (
               <div
                 key={message.id}
-                className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
+                className={cn(
+                  "flex animate-in fade-in slide-in-from-bottom-2 duration-300",
+                  message.role === "user" ? "justify-end" : "justify-start"
+                )}
               >
                 <div
-                  className={`max-w-[80%] rounded-2xl px-4 py-3 ${
+                  className={cn(
+                    "max-w-[85%] rounded-2xl px-4 py-3",
                     message.role === "user"
                       ? "bg-green-600 text-white"
                       : "bg-muted"
-                  }`}
+                  )}
                 >
                   <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-                  {message.options && (
+                  
+                  {/* Show metrics card */}
+                  {message.showMetrics && (
+                    <div className="mt-3 grid grid-cols-2 gap-2">
+                      <div className="bg-background/50 rounded-lg p-2">
+                        <Zap className="w-4 h-4 text-yellow-600 mb-1" />
+                        <div className="text-xs text-muted-foreground">Electricity</div>
+                        <div className="font-bold">{totalMetrics.electricity} kW</div>
+                      </div>
+                      <div className="bg-background/50 rounded-lg p-2">
+                        <Thermometer className="w-4 h-4 text-red-600 mb-1" />
+                        <div className="text-xs text-muted-foreground">HVAC</div>
+                        <div className="font-bold">{totalMetrics.hvac}°C</div>
+                      </div>
+                      <div className="bg-background/50 rounded-lg p-2">
+                        <Droplets className="w-4 h-4 text-blue-600 mb-1" />
+                        <div className="text-xs text-muted-foreground">Water</div>
+                        <div className="font-bold">{totalMetrics.water} L/min</div>
+                      </div>
+                      <div className="bg-background/50 rounded-lg p-2">
+                        <TrendingUp className="w-4 h-4 text-green-600 mb-1" />
+                        <div className="text-xs text-muted-foreground">Lighting</div>
+                        <div className="font-bold">{totalMetrics.lighting}%</div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Show improvements card */}
+                  {message.showImprovements && (
+                    <div className="mt-3 space-y-2">
+                      {[
+                        { label: "Energy Reduction", value: "32%", icon: Zap },
+                        { label: "HVAC Efficiency", value: "28%", icon: Thermometer },
+                        { label: "Water Savings", value: "24%", icon: Droplets },
+                        { label: "Lighting Costs", value: "35%", icon: TrendingUp },
+                      ].map((item, i) => (
+                        <div key={i} className="flex items-center gap-2 bg-green-100 dark:bg-green-900/30 rounded-lg p-2">
+                          <item.icon className="w-4 h-4 text-green-600" />
+                          <span className="text-xs flex-1">{item.label}</span>
+                          <span className="font-bold text-green-600">{item.value}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Options buttons */}
+                  {message.options && message.options.length > 0 && (
                     <div className="flex flex-wrap gap-2 mt-3">
                       {message.options.map((option, i) => (
                         <button
                           key={i}
                           onClick={() => handleOptionClick(option)}
-                          className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-medium rounded-full transition-colors"
+                          className={cn(
+                            "px-3 py-1.5 rounded-full text-xs font-medium transition-all flex items-center gap-1",
+                            message.role === "user"
+                              ? "bg-white/20 hover:bg-white/30 text-white"
+                              : "bg-green-600 hover:bg-green-700 text-white"
+                          )}
                         >
                           {option}
+                          <ChevronRight className="w-3 h-3" />
                         </button>
                       ))}
                     </div>
@@ -563,8 +640,9 @@ export default function DashboardPage() {
                 </div>
               </div>
             ))}
+            
             {isTyping && (
-              <div className="flex justify-start">
+              <div className="flex justify-start animate-in fade-in">
                 <div className="bg-muted rounded-2xl px-4 py-3">
                   <div className="flex gap-1">
                     <span className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
